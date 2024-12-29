@@ -1,0 +1,123 @@
+datasource internet_usage_log(
+  upload_bytes_count,
+  download_bytes_count,
+  upload_time_millis,
+  download_time_millis,
+  upload_retransmitted_packets_count,
+  upload_packets_count,
+  download_retransmitted_packets_count,
+  download_packets_count,
+  client_id,
+  client_phone_number,
+  cell_id,
+  action_time
+) from CSV file "internet_usage_log.csv";
+
+datasource cell_connection_log(
+  client_id,
+  client_phone_number,
+  cell_id,
+  action_time
+) from CSV file "cell_connection_log.csv";
+
+datasource calls_log(
+  lost_packets_count,
+  client_id,
+  client_phone_number,
+  cell_id,
+  action_time
+) from CSV file "calls_log.csv";
+
+datasource cells(
+  id,
+  technology_name,
+  cluster_name,
+  zone_name,
+  territory_name
+) from CSV file "cells.csv";
+
+concept enrichedLog[source] is $source with
+  operatorCode = substring(client_id, 1, 6),
+  operatorName = case
+    when operatorCode = "1234" then "xtelecom"
+    when operatorCode = "1235" then "ytelecom"
+    when not like(operatorCode, "123%") then "roaming"
+    else "unknown",
+  client_phone_number = if (length(client_phone_number) = 10 and not like(client_phone_number, "1%"))
+    then concat("1", client_phone_number)
+    else client_phone_number,
+  actionDay = floor(action_time, "day");
+
+concept logDimensions[source] is enrichedLog[source: source] l, cells c (id = l.cell_id) without c.id;
+
+concept cube internetUsageMetrics metrics (
+  dataBytesTotal = sum(il.upload_bytes_count + il.download_bytes_count),
+  timeTotal = sum(il.upload_time_millis + il.download_time_millis),
+  packetsTotal = sum(il.upload_packets_count + il.download_packets_count),
+  lostPackets = sum(il.upload_retransmitted_packets_count - il.upload_packets_count + il.download_retransmitted_packets_count - il.download_packets_count)
+) dimensions (
+  client_id, client_phone_number, technology_name, cluster_name, zone_name, territory_name, actionDay
+) from logDimensions[source: "internet_usage_log"] il;
+
+concept cube callsMetrics metrics (
+  lostPackets = sum(cl.lost_packets_count)
+) dimensions (
+  client_id, client_phone_number, technology_name, cluster_name, zone_name, territory_name, actionDay
+) from logDimensions[source: "calls_log"] cl;
+
+concept cube cellConnectionMetrics metrics (
+  leadTimestamp = coalesce(
+    lead(ccl.action_time) over (
+      partition by (ccl.client_id, ccl.client_phone_number, ccl.actionDay)
+      order by (ccl.client_id asc, ccl.action_time asc)
+    ),
+    ccl.action_time
+  ),
+  fillForwardTimeSpentAtSite = round((max(leadTimestamp) - min(ccl.action_time)) / 60),
+  timeSpentAtSite = if fillForwardTimeSpentAtSite <= 0 then 5 else fillForwardTimeSpentAtSite
+) dimensions (
+  client_id, client_phone_number, technology_name, cluster_name, zone_name, territory_name, actionDay
+) from logDimensions[source: "cell_connection_log"] ccl;
+
+@Materialized (type = "Incremental", strategy = "InsertDelete", uniqueKey = "actionDay", operator = "in")
+concept cube internetUsageMetricsUnion is internetUsageMetrics with metrics
+  lostInternetPackets = lostPackets,
+  lostCallPackets = Null,
+  timeSpentAtSite = Null
+without metrics lostPackets;
+
+@Materialized (type = "Incremental", strategy = "InsertDelete", uniqueKey = "actionDay", operator = "in")
+concept cube callsMetricsUnion is callsMetrics with metrics
+  lostCallPackets = lostPackets,
+  lostInternetPackets = Null,
+  timeSpentAtSite = Null,
+  dataBytesTotal = Null,
+  timeTotal = Null,
+  packetsTotal = Null
+without metrics lostPackets;
+
+@Materialized (type = "Incremental", strategy = "InsertDelete", uniqueKey = "actionDay", operator = "in")
+concept cube cellConnectionMetricsUnion is cellConnectionMetrics with metrics
+  lostCallPackets = Null,
+  lostInternetPackets = Null,
+  dataBytesTotal = Null,
+  timeTotal = Null,
+  packetsTotal = Null
+without metrics leadTimestamp, fillForwardTimeSpentAtSite;
+
+concept customerBehaviorMetricsUnion union of internetUsageMetricsUnion, callsMetricsUnion, cellConnectionMetricsUnion;
+
+@Materialized (type = "Incremental", strategy = "InsertDelete", uniqueKey = "actionDay", operator = "in")
+concept cube customerBehaviorMetrics metrics (
+  dataBytesTotal = max(p.dataBytesTotal),
+  timeTotal = max(p.timeTotal),
+  packetsTotal = max(p.packetsTotal),
+  lostInternetPackets = max(p.lostInternetPackets),
+  lostCallPackets = max(p.lostCallPackets),
+  timeSpentAtSite = max(p.timeSpentAtSite)
+) dimensions (
+  client_id, client_phone_number, technology_name, cluster_name, zone_name, territory_name, actionDay
+) from customerBehaviorMetricsUnion p;
+
+
+
