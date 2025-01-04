@@ -7,7 +7,7 @@ import org.apache.calcite.tools.FrameworkConfig
 import org.sens.core.concept.{AggregationConcept, Annotation, Attribute, Concept, CubeConcept, CubeInheritedConcept, DataSourceConcept, FunctionConcept, InheritedConcept, IntersectConcept, MinusConcept, Order, ParentConcept, SensConcept, UnionConcept}
 import org.sens.core.expression.{ConceptAttribute, SensExpression}
 import org.sens.core.expression.concept.{AnonymousConceptDefinition, ConceptReference, SensConceptExpression}
-import org.sens.parser.{AttributeExpressionNotFound, ElementNotFoundException, ValidationContext, WrongArgumentsException}
+import org.sens.parser.{AttributeExpressionNotFound, ElementNotFoundException, ValidationContext, WrongArgumentsException, AttributeNamesDoNotMatch}
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
 
@@ -24,7 +24,7 @@ class ConceptToSqlConverter (context: ValidationContext, config: FrameworkConfig
     validationContext.setCurrentConcept(concept)
     val query = concept match {
       case conceptDef: Concept => {
-        prepareQuery(conceptDef.inferAttributeExpressions(context).get)
+        prepareQuery(conceptDef.inferAttributeExpressions(validationContext).get)
       }
       case cubeConcept: CubeConcept => {
         val conceptDef = cubeConcept.inferAttributeExpressions(validationContext).get
@@ -46,24 +46,27 @@ class ConceptToSqlConverter (context: ValidationContext, config: FrameworkConfig
         prepareDataSourceQuery(dsDef)
       }
       case intersectConceptDef: IntersectConcept => {
+        val attributesOrder = intersectConceptDef.getAttributeNames(validationContext)
         val parentConceptsSql = intersectConceptDef
-          .inferAttributeExpressions(context)
+          .inferAttributeExpressions(validationContext)
           .get
-          .parentConcepts.map(pc => prepareParentConceptQuery(pc.concept, pc.alias))
+          .parentConcepts.map(pc => prepareParentConceptQuery(pc.concept, pc.alias, Some(attributesOrder)))
         composeSetQuery(parentConceptsSql, SqlStdOperatorTable.INTERSECT)
       }
       case unionConceptDef: UnionConcept => {
+        val attributesOrder = unionConceptDef.getAttributeNames(validationContext)
         val parentConceptsSql = unionConceptDef
-          .inferAttributeExpressions(context)
+          .inferAttributeExpressions(validationContext)
           .get
-          .parentConcepts.map(pc => prepareParentConceptQuery(pc.concept, pc.alias))
+          .parentConcepts.map(pc => prepareParentConceptQuery(pc.concept, pc.alias, Some(attributesOrder)))
         composeSetQuery(parentConceptsSql, SqlStdOperatorTable.UNION)
       }
       case minusConceptDef: MinusConcept => {
+        val attributesOrder = minusConceptDef.getAttributeNames(validationContext)
         val parentConceptsSql = minusConceptDef
-          .inferAttributeExpressions(context)
+          .inferAttributeExpressions(validationContext)
           .get
-          .parentConcepts.map(pc => prepareParentConceptQuery(pc.concept, pc.alias))
+          .parentConcepts.map(pc => prepareParentConceptQuery(pc.concept, pc.alias, Some(attributesOrder)))
         composeSetQuery(parentConceptsSql, SqlStdOperatorTable.EXCEPT)
       }
       case _ =>
@@ -313,7 +316,7 @@ class ConceptToSqlConverter (context: ValidationContext, config: FrameworkConfig
     )
   }
 
-  def prepareParentConceptQuery(parentConceptExpr: SensConceptExpression, aliasOpt: Option[String]): SqlNode = {
+  def prepareParentConceptQuery(parentConceptExpr: SensConceptExpression, aliasOpt: Option[String], attributesOrder: Option[List[String]]): SqlNode = {
     val alias = aliasOpt.getOrElse("t")
     parentConceptExpr match {
       case ref: ConceptReference => {
@@ -321,17 +324,36 @@ class ConceptToSqlConverter (context: ValidationContext, config: FrameworkConfig
         if (conDefOpt.isEmpty) {
           throw ElementNotFoundException(ref.getName)
         }
-        val attributes: List[Attribute] = conDefOpt.get.concept.getAttributes(context)
-        val anonConDef = AnonymousConceptDefinition.builder(
+        val attributes: List[Attribute] = conDefOpt.get.concept.getAttributes(validationContext)
+        val orderedAttributes = if(attributesOrder.isDefined) {
+          attributesOrder.get.map(attrName =>
+            if(attributes.exists(_.name == attrName)) {
+              Attribute(attrName, Some(ConceptAttribute(alias :: Nil, attrName)), Nil)
+            } else {
+              throw AttributeNamesDoNotMatch()
+            }
+          )
+        } else {
           attributes.map(attr => {
             Attribute(attr.name, Some(ConceptAttribute(alias :: Nil, attr.name)), Nil)
-          }),
+          })
+        }
+        val anonConDef = AnonymousConceptDefinition.builder(
+          orderedAttributes,
           ParentConcept(ConceptReference(ref.conceptName), Some(alias), Map(), Nil) :: Nil
         ).build()
         toSqlNode(anonConDef.toConcept())
       }
       case anonDef: AnonymousConceptDefinition =>
-        val conDef = anonDef.toConcept()
+        val conDef = if(attributesOrder.isDefined) {
+          val attributes = anonDef.getAttributes(validationContext)
+          val orderedAttributes = attributesOrder.get.map(curAttrName =>
+            attributes.find(_.name == curAttrName).getOrElse(throw AttributeNamesDoNotMatch())
+          )
+          anonDef.copy(attributes = orderedAttributes).toConcept()
+        } else {
+          anonDef.toConcept()
+        }
         toSqlNode(conDef)
       case _ => throw new NotImplementedError()
     }

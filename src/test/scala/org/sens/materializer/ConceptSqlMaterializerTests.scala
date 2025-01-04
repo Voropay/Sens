@@ -211,7 +211,7 @@ class ConceptSqlMaterializerTests extends AnyFlatSpec with Matchers {
     materializer.materializeSql(conDef, false) should equal(
       """DELETE FROM `conceptA`
         |WHERE `date` = CURRENT_DATE;
-        |INSERT INTO `conceptA`
+        |INSERT INTO `conceptA` (`id`, `val`, `date`)
         |(SELECT `cb`.`attr1` AS `id`, `cb`.`attr2` + `cb`.`attr3` AS `val`, `cb`.`attr4` AS `date`
         |FROM `someFile` AS `cb`
         |WHERE `date` = CURRENT_DATE AND (`val` = 1 AND `cb`.`attr4` > 0));""".stripMargin
@@ -261,7 +261,7 @@ class ConceptSqlMaterializerTests extends AnyFlatSpec with Matchers {
 
     val materializer = ConceptSqlMaterializer.create(context)
     materializer.materializeSql(conDef, false, Some(IntLiteral(123456789))) should equal(
-      """INSERT INTO `conceptA`
+      """INSERT INTO `conceptA` (`id`, `val`, `date`)
         |(SELECT `cb`.`attr1` AS `id`, `cb`.`attr2` + `cb`.`attr3` AS `val`, `cb`.`attr4` AS `date`
         |FROM `someFile` AS `cb`
         |WHERE `date` > 123456789 AND (`val` = 1 AND `cb`.`attr4` > 0));""".stripMargin

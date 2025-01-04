@@ -172,14 +172,18 @@ class ConceptSqlMaterializer(context: ValidationContext, config: FrameworkConfig
     val conditionNode = composer.sqlConverter.expressionConverter.sensExpressionToSqlNode(condition)
     val deleteStmt = new SqlDelete(SqlParserPos.ZERO, tableId, conditionNode, null, null)
     val source = composer.composeToSqlNode(concept)
-    val insertStmt = new SqlInsert(SqlParserPos.ZERO, SqlNodeList.EMPTY, tableId, source, null)
+    val columnList = concept.getAttributeNames(context).map(curName => new SqlIdentifier(List(curName).asJava, SqlParserPos.ZERO))
+    val columnListNode = new SqlNodeList(columnList.asJava, SqlParserPos.ZERO)
+    val insertStmt = new SqlInsert(SqlParserPos.ZERO, SqlNodeList.EMPTY, tableId, source, columnListNode)
     composer.sqlConverter.expressionConverter.toSql(deleteStmt) + ";\n" + composer.sqlConverter.expressionConverter.toSql(insertStmt) + ";"
   }
 
   def insertTable(materializationName: String, concept: SensConcept): String = {
     val tableId = new SqlIdentifier(List(materializationName).asJava, SqlParserPos.ZERO)
     val source = composer.composeToSqlNode(concept)
-    val insertStmt = new SqlInsert(SqlParserPos.ZERO, SqlNodeList.EMPTY, tableId, source, null)
+    val columnList = concept.getAttributeNames(context).map(curName => new SqlIdentifier(List(curName).asJava, SqlParserPos.ZERO))
+    val columnListNode = new SqlNodeList(columnList.asJava, SqlParserPos.ZERO)
+    val insertStmt = new SqlInsert(SqlParserPos.ZERO, SqlNodeList.EMPTY, tableId, source, columnListNode)
     composer.sqlConverter.expressionConverter.toSql(insertStmt) + ";"
   }
 
