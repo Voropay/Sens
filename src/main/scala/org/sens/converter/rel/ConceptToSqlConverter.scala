@@ -4,10 +4,10 @@ import org.apache.calcite.sql.fun.SqlStdOperatorTable
 import org.apache.calcite.sql.parser.SqlParserPos
 import org.apache.calcite.sql.{JoinConditionType, JoinType, SqlBasicCall, SqlCall, SqlIdentifier, SqlJoin, SqlLiteral, SqlNode, SqlNodeList, SqlSelect, SqlSelectKeyword, SqlSetOperator}
 import org.apache.calcite.tools.FrameworkConfig
-import org.sens.core.concept.{AggregationConcept, Annotation, Attribute, Concept, CubeConcept, CubeInheritedConcept, DataSourceConcept, FunctionConcept, InheritedConcept, IntersectConcept, MinusConcept, Order, ParentConcept, SensConcept, UnionConcept}
+import org.sens.core.concept.{AggregationConcept, Annotation, Attribute, Concept, ConceptAttributes, CubeConcept, CubeInheritedConcept, DataSourceConcept, FunctionConcept, InheritedConcept, IntersectConcept, MinusConcept, Order, ParentConcept, SensConcept, UnionConcept}
 import org.sens.core.expression.{ConceptAttribute, SensExpression}
 import org.sens.core.expression.concept.{AnonymousConceptDefinition, ConceptReference, SensConceptExpression}
-import org.sens.parser.{AttributeExpressionNotFound, ElementNotFoundException, ValidationContext, WrongArgumentsException, AttributeNamesDoNotMatch}
+import org.sens.parser.{AttributeExpressionNotFound, AttributeNamesDoNotMatch, ElementNotFoundException, ValidationContext, ValidationException, WrongArgumentsException}
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
 
@@ -40,6 +40,10 @@ class ConceptToSqlConverter (context: ValidationContext, config: FrameworkConfig
       }
       case aggregationDef: AggregationConcept => {
         val conceptDef = aggregationDef.inferAttributeExpressions(validationContext).get
+        prepareQuery(conceptDef)
+      }
+      case conceptAttributesDef: ConceptAttributes => {
+        val conceptDef = conceptAttributesDef.inferAttributeExpressions(validationContext).get
         prepareQuery(conceptDef)
       }
       case dsDef: DataSourceConcept => {
@@ -95,12 +99,16 @@ class ConceptToSqlConverter (context: ValidationContext, config: FrameworkConfig
   }
 
   def prepareQuery(concept: Concept): SqlSelect = {
+    val conceptAttributes = concept.attributes.map {
+      case a: Attribute => a
+      case _ => throw new ValidationException("Attribute values must be inferred")
+    }
     val keywords = if(concept.annotations.contains(Annotation.UNIQUE)) {
       new SqlNodeList(List(SqlSelectKeyword.DISTINCT.symbol(SqlParserPos.ZERO)).asJava, SqlParserPos.ZERO)
     } else {
       null
     }
-    val selectList: SqlNodeList = attributesToSqlNodeList(concept.attributes)
+    val selectList: SqlNodeList = attributesToSqlNodeList(conceptAttributes)
     val joins: SqlNode = parentConceptsToJoin(concept.parentConcepts)
     val where = if(concept.attributeDependencies.isEmpty) {
       null

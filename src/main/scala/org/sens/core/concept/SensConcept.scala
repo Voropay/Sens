@@ -28,19 +28,7 @@ trait SensConcept extends SensElement {
   def isTransparent: Boolean
   def getMaterialization: Annotation = getAnnotations.find(_.name == Annotation.MATERIALIZED).getOrElse(Annotation.MATERIALIZED_EPHEMERAL)
 
-  def expressionToAttribute(expression: SensExpression, attributesNames: Set[String]): Option[String] = {
-    expression match {
-      case expr: ConceptAttribute =>
-        if(expr.conceptsChain.isEmpty && attributesNames.contains(expr.attribute)) {
-          Some(expr.attribute)
-        } else {
-          None
-        }
-      case expr: Variable =>
-        Some(expr.name).filter(attributesNames.contains)
-      case _ => None
-    }
-  }
+  def composeAttributes(attributes: List[SensAttribute], context: ValidationContext): List[Attribute] = attributes.flatMap(_.getAttributes(context))
 
   def splitAndExpression(expression: SensExpression): List[SensExpression] = {
     expression match {
@@ -51,29 +39,6 @@ trait SensConcept extends SensElement {
       }
       case _ => expression :: Nil
     }
-  }
-
-  def deriveAttributeExpressionsFromDependencies(attributesNames: Set[String], attributeDependencies: Option[SensExpression]): Map[String, SensExpression] = {
-    var attributesMap: Map[String, SensExpression] = Map()
-    if(attributeDependencies.isDefined) {
-      val dependencies = splitAndExpression(attributeDependencies.get)
-      for(curDep <- dependencies) {
-        curDep match {
-          case exp: Equals => {
-            val leftAttrName = expressionToAttribute(exp.operand1, attributesNames)
-            val rightAttrName = expressionToAttribute(exp.operand2, attributesNames)
-            if(leftAttrName.isDefined && rightAttrName.isEmpty && !attributesMap.contains(leftAttrName.get)) {
-              attributesMap += (leftAttrName.get -> exp.operand2)
-            }
-            if(rightAttrName.isDefined && leftAttrName.isEmpty && !attributesMap.contains(rightAttrName.get)) {
-              attributesMap += (rightAttrName.get -> exp.operand1)
-            }
-            //ToDo: handle attributes equality eg. attr1 = attr2
-          }
-        }
-      }
-    }
-    attributesMap
   }
 
   def equalAttributeNames(attributeNames: List[List[String]]): Boolean = {

@@ -14,13 +14,13 @@ class TelecomExampleTests extends AnyFlatSpec with Matchers {
     val parsingResults = MainApp.parseDataModel(program, conceptParser)
     parsingResults.isRight should be(true)
     val context = parsingResults.right.get
-    context.getConcepts.size should equal(14)
+    context.getConcepts.size should equal(15)
 
     val sqlCode = MainApp.materialize(context, false, Some(ListLiteral(StringLiteral("2024-01-01") :: Nil)))
     sqlCode.contains("internetUsageMetrics") should be (true)
     sqlCode.contains("callsMetrics") should be (true)
     sqlCode.contains("cellConnectionMetrics") should be (true)
     sqlCode.contains("customerBehaviorMetrics") should be (true)
-    println(sqlCode)
+    //println(sqlCode)
   }
 }

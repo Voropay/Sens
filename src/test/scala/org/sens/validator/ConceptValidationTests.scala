@@ -11,8 +11,9 @@ import org.sens.core.expression.{ConceptAttribute, FunctionCall, GenericParamete
 import org.sens.core.expression.operation.arithmetic.{Add, Multiply}
 import org.sens.core.expression.operation.comparison.{Equals, GreaterThan}
 import org.sens.core.statement.{ConceptDefinition, FunctionDefinition, NOP, Return, VariableDefinition}
-import org.sens.parser.{AttributeNamesDoNotMatch, ElementNotFoundException, GenericDefinitionException, ValidationContext}
+import org.sens.parser.{AttributeNamesDoNotMatch, ElementNotFoundException, GenericDefinitionException, ValidationContext, WrongConceptType}
 
+import scala.collection.immutable.Map
 import scala.util.{Failure, Success}
 
 class ConceptValidationTests extends AnyFlatSpec with Matchers  {
@@ -204,6 +205,102 @@ class ConceptValidationTests extends AnyFlatSpec with Matchers  {
     ).genericParameters("myGenericName" :: Nil).build())
     gcr1.validateAndRemoveVariablePlaceholders(context) should equal(
       Success(GenericConceptReference(ExpressionIdent(GenericParameter("myGenericName")), Map()))
+    )
+  }
+
+  "Concept Attributes Reference" should "be validated correctly" in {
+    val context = ValidationContext()
+    val car = ConceptAttributesReference(ConstantIdent("conceptAttributes"), Map("src" -> NamedElementPlaceholder("mySrc")))
+    car.validateAndRemoveVariablePlaceholders(context) should equal(
+      Failure(ElementNotFoundException("mySrc"))
+    )
+
+    context.setCurrentConcept(Concept.builder(
+      "myConcept",
+      Attribute("attr1", None, Nil) ::
+        car ::
+        Nil,
+      ParentConcept(
+        GenericConceptReference(ExpressionIdent(GenericParameter("mySrc")), Map()),
+        None, Map(), Nil) :: Nil
+    ).genericParameters("mySrc" :: Nil).build())
+    car.validateAndRemoveVariablePlaceholders(context) should equal(
+      Failure(ElementNotFoundException("conceptAttributes"))
+    )
+
+    context.addConcept(ConceptDefinition(
+      Concept.builder(
+        "conceptAttributes",
+        Attribute("val", None, Nil) :: Nil,
+        ParentConcept(
+          GenericConceptReference(ExpressionIdent(GenericParameter("src")), Map()),
+          None, Map(), Nil) :: Nil
+      ).genericParameters("src" :: Nil).build()
+    ))
+    car.validateAndRemoveVariablePlaceholders(context) should equal(
+      Failure(WrongConceptType("ConceptAttributes", "Concept"))
+    )
+
+    context.addConcept(ConceptDefinition(
+      ConceptAttributes.builder(
+        "conceptAttributes",
+        Attribute("attr2", None, Nil) :: Nil,
+        ParentConcept(ConceptReference("source"), Some("s"), Map(), Nil) :: Nil
+      ).build()
+    ))
+    car.validateAndRemoveVariablePlaceholders(context) should equal(
+      Failure(GenericDefinitionException("Generic parameters do not match for concept conceptAttributes"))
+    )
+
+    context.addConcept(ConceptDefinition(
+      ConceptAttributes.builder(
+        "conceptAttributes",
+        Attribute("attr2", None, Nil) :: Nil,
+        ParentConcept(ConceptReference("source"), Some("src"), Map(), Nil) :: Nil
+      ).build()
+    ))
+    car.validateAndRemoveVariablePlaceholders(context) should equal(
+      Success(ConceptAttributesReference(ConstantIdent("conceptAttributes"), Map("src" -> GenericParameter("mySrc"))))
+    )
+
+    context.addConcept(ConceptDefinition(
+      ConceptAttributes.builder(
+        "conceptAttributes",
+        Attribute("attr2", None, Nil) :: Nil,
+        ParentConcept(
+          GenericConceptReference(ExpressionIdent(GenericParameter("sourceName")), Map()),
+          Some("src"), Map(), Nil) :: Nil
+      ).genericParameters("sourceName" :: Nil).build()
+    ))
+    car.validateAndRemoveVariablePlaceholders(context) should equal(
+      Success(ConceptAttributesReference(ConstantIdent("conceptAttributes"), Map("src" -> GenericParameter("mySrc"))))
+    )
+
+    val car1 = ConceptAttributesReference(ConstantIdent("conceptAttributes"),
+      Map("src" -> StringLiteral("mySrc"), "source" -> StringLiteral("sourceConcept")))
+    car1.validateAndRemoveVariablePlaceholders(context) should equal(
+      Success(ConceptAttributesReference(ConstantIdent("conceptAttributes"),
+        Map("src" -> StringLiteral("mySrc"), "source" -> StringLiteral("sourceConcept"))))
+    )
+
+    context.addConcept(ConceptDefinition(
+      ConceptAttributes.builder(
+        "conceptAttributes",
+        Attribute("attr2", None, Nil) :: Nil,
+        ParentConcept(
+          ConceptReference("source"),
+          None, Map(), Nil) :: Nil
+      ).build()
+    ))
+    car1.validateAndRemoveVariablePlaceholders(context) should equal(
+      Failure(GenericDefinitionException("Generic parameters do not match for concept conceptAttributes"))
+    )
+
+    val car2 = ConceptAttributesReference(ConstantIdent("conceptAttributes"),
+      Map("0" -> StringLiteral("mySrc")))
+    car2.validateAndRemoveVariablePlaceholders(context) should equal(
+      Success(ConceptAttributesReference(ConstantIdent("conceptAttributes"),
+        Map("0" -> StringLiteral("mySrc"))))
     )
   }
 

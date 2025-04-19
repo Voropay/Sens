@@ -21,7 +21,7 @@ import org.sens.core.expression.{ConceptAttribute, SensExpression}
 import org.sens.core.expression.literal.BooleanLiteral
 import org.sens.core.expression.function.FunctionReference
 import org.sens.core.expression.concept.{AnonymousConceptDefinition, ConceptReference}
-import org.sens.parser.{AttributeExpressionNotFound, ElementNotFoundException, ValidationContext}
+import org.sens.parser.{AttributeExpressionNotFound, ElementNotFoundException, ValidationContext, ValidationException}
 
 import java.util.{Collections, Properties}
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
@@ -115,13 +115,17 @@ class ConceptToRelConverter(context: ValidationContext, config: FrameworkConfig,
   }
 
   def prepareQuery(concept: Concept, relBuilder: RelBuilder, numberOfTables: Int): RelNode = {
-    val joins = prepareJoins(concept.parentConcepts, concept.attributes, relBuilder, numberOfTables)
-    val filters = prepareFilters(concept.attributeDependencies, concept.attributes, joins, numberOfTables)
+    val conceptAttributes = concept.attributes.map {
+      case a: Attribute => a
+      case _ => throw new ValidationException("Attribute values must be inferred")
+    }
+    val joins = prepareJoins(concept.parentConcepts, conceptAttributes, relBuilder, numberOfTables)
+    val filters = prepareFilters(concept.attributeDependencies, conceptAttributes, joins, numberOfTables)
     val projections = if(isAggregateConcept(concept)) {
-      val aggregates = prepareAggregate(concept.attributes, concept.groupByAttributes,  filters, numberOfTables)
+      val aggregates = prepareAggregate(conceptAttributes, concept.groupByAttributes,  filters, numberOfTables)
       prepareFilters(concept.groupDependencies, Nil, aggregates, numberOfTables)
     } else {
-      prepareProjections(concept.attributes, concept.attributes, concept.annotations, filters, numberOfTables)
+      prepareProjections(conceptAttributes, conceptAttributes, concept.annotations, filters, numberOfTables)
     }
     val limits = prepareSortAndLimit(concept.orderByAttributes, concept.limit, concept.offset, projections, numberOfTables)
     limits.build()

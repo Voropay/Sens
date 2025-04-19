@@ -50,19 +50,21 @@ concept enrichedLog[source] is $source with
 
 concept logDimensions[source] is enrichedLog[source: source] l, cells c (id = l.cell_id) without c.id;
 
+concept attributes dimensionsList[source] (
+  client_id, client_phone_number, technology_name, cluster_name, zone_name, territory_name, actionDay)
+from $source src;
+
 concept cube internetUsageMetrics metrics (
   dataBytesTotal = sum(il.upload_bytes_count + il.download_bytes_count),
   timeTotal = sum(il.upload_time_millis + il.download_time_millis),
   packetsTotal = sum(il.upload_packets_count + il.download_packets_count),
   lostPackets = sum(il.upload_retransmitted_packets_count - il.upload_packets_count + il.download_retransmitted_packets_count - il.download_packets_count)
-) dimensions (
-  client_id, client_phone_number, technology_name, cluster_name, zone_name, territory_name, actionDay
+) dimensions (dimensionsList[src: "il"]
 ) from logDimensions[source: "internet_usage_log"] il;
 
 concept cube callsMetrics metrics (
   lostPackets = sum(cl.lost_packets_count)
-) dimensions (
-  client_id, client_phone_number, technology_name, cluster_name, zone_name, territory_name, actionDay
+) dimensions (dimensionsList[src: "cl"]
 ) from logDimensions[source: "calls_log"] cl;
 
 concept cube cellConnectionMetrics metrics (
@@ -75,8 +77,7 @@ concept cube cellConnectionMetrics metrics (
   ),
   fillForwardTimeSpentAtSite = round((max(leadTimestamp) - min(ccl.action_time)) / 60),
   timeSpentAtSite = if fillForwardTimeSpentAtSite <= 0 then 5 else fillForwardTimeSpentAtSite
-) dimensions (
-  client_id, client_phone_number, technology_name, cluster_name, zone_name, territory_name, actionDay
+) dimensions (dimensionsList[src: "ccl"]
 ) from logDimensions[source: "cell_connection_log"] ccl;
 
 @Materialized (type = "Incremental", strategy = "InsertDelete", uniqueKey = "actionDay", operator = "in")
@@ -115,8 +116,7 @@ concept cube customerBehaviorMetrics metrics (
   lostInternetPackets = max(p.lostInternetPackets),
   lostCallPackets = max(p.lostCallPackets),
   timeSpentAtSite = max(p.timeSpentAtSite)
-) dimensions (
-  client_id, client_phone_number, technology_name, cluster_name, zone_name, territory_name, actionDay
+) dimensions (dimensionsList[src: "p"]
 ) from customerBehaviorMetricsUnion p;
 
 

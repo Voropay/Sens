@@ -11,7 +11,7 @@ import scala.util.{Failure, Success, Try}
 
 case class Concept(name: String,
                    genericParameters: List[String],
-                   attributes: List[Attribute],
+                   attributes: List[SensAttribute],
                    parentConcepts: List[ParentConcept],
                    attributeDependencies: Option[SensExpression],
                    groupByAttributes: List[SensExpression],
@@ -63,11 +63,11 @@ case class Concept(name: String,
       annotations.map(_.replaceSubExpression(replaceSubExpression, withSubExpression))
     )
 
-  override def getAttributeNames(context: ValidationContext): List[String] = attributes.map(_.name)
+  override def getAttributeNames(context: ValidationContext): List[String] = composeAttributes(attributes, context).map(_.name)
 
-  override def getAttributes(context: ValidationContext): List[Attribute] = attributes
+  override def getAttributes(context: ValidationContext): List[Attribute] = composeAttributes(attributes, context)
 
-  override def getCurrentAttributes(context: ValidationContext): List[Attribute] = attributes
+  override def getCurrentAttributes(context: ValidationContext): List[Attribute] = composeAttributes(attributes, context)
 
   override def getParentConcepts(context: ValidationContext): List[ParentConcept] = parentConcepts
 
@@ -82,9 +82,10 @@ case class Concept(name: String,
     //1. Merge attribute expressions from the child and parent concepts and dependencies into one list
     val attributeEqualityExpressions = ListBuffer[Equals]()
     val otherExpressions = ListBuffer[SensExpression]()
+    val composedAttributes = composeAttributes(attributes, context)
 
     //Get expressions from attribute definitions
-    for(curAttr <- attributes) {
+    for(curAttr <- composedAttributes) {
       if(curAttr.value.isDefined) {
         attributeEqualityExpressions += Equals(ConceptAttribute(Nil, curAttr.name), curAttr.value.get)
       }
@@ -94,7 +95,7 @@ case class Concept(name: String,
     getExpressionsFromDependencies(attributeEqualityExpressions, otherExpressions, attributeDependencies)
 
     //2. Set expressions for the attributes
-    val inferredAttributesExpressions: List[Try[Attribute]] = attributes.map(curAttr => {
+    val inferredAttributesExpressions: List[Try[Attribute]] = composedAttributes.map(curAttr => {
       if(curAttr.value.isDefined) {
         removeAttributeExpressionFromList(
           Equals(ConceptAttribute(Nil, curAttr.name), curAttr.value.get),
@@ -187,7 +188,7 @@ case class Concept(name: String,
 
 object Concept {
   def builder(name: String,
-              attributes: List[Attribute],
+              attributes: List[SensAttribute],
               parentConcepts: List[ParentConcept]
              ): ConceptBuilder = {
     new ConceptBuilder(name, attributes, parentConcepts)
@@ -195,7 +196,7 @@ object Concept {
 }
 
 class ConceptBuilder(name: String,
-                     attributes: List[Attribute],
+                     attributes: List[SensAttribute],
                      parentConcepts: List[ParentConcept]) {
   var genericParameters: List[String] = Nil
   var attributeDependencies: Option[SensExpression] = None

@@ -8,7 +8,10 @@ import scala.util.Try
 
 case class Attribute(name: String,
                      value: Option[SensExpression],
-                     annotations: List[Annotation]) extends SensElement {
+                     annotations: List[Annotation]) extends SensAttribute {
+  override def getAttributeNames(context: ValidationContext): List[String] = name :: Nil
+
+  override def getAttributes(context: ValidationContext): List[Attribute] = this :: Nil
   override def toSensString: String =
     (if (annotations.nonEmpty) annotations.map(_.toSensString).mkString(", ") + " " else "") +
     name +

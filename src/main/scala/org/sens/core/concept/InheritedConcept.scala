@@ -1,6 +1,5 @@
 package org.sens.core.concept
 
-import org.sens.core.expression.concept.{AnonymousConceptDefinition, ConceptReference, GenericConceptReference}
 import org.sens.core.expression.literal.SensLiteral
 import org.sens.core.expression.{ConceptAttribute, GenericParameter, SensExpression}
 import org.sens.parser.{GenericDefinitionException, ValidationContext, WrongTypeException}

@@ -396,4 +396,76 @@ class GenericConceptsTests extends AnyFlatSpec with Matchers {
         .build()
     )
   }
+
+  "Concept Attributes reference" should "be formatted in Sens correctly" in {
+    ConceptAttributesReference(ConstantIdent("name"), Map("src" -> StringLiteral("s"))).toSensString should equal(
+      "name[src: \"s\"]"
+    )
+    ConceptAttributesReference(ExpressionIdent(GenericParameter("name")), Map("src" -> StringLiteral("s"))).toSensString should equal(
+      "$name[src: \"s\"]"
+    )
+  }
+
+  "Generic Concept Attributes" should "be instantiated correctly" in {
+    val context = ValidationContext()
+    context.addConcept(ConceptDefinition(DataSourceConcept(
+      "conceptDataSource",
+      Attribute("attr1", None, Nil) ::
+        Attribute("attr2", None, Nil) :: Nil,
+      FileDataSource("someFile1", FileFormats.CSV),
+      Nil
+    )))
+    context.addConcept(ConceptDefinition(
+      ConceptAttributes.builder(
+        "conceptAttr",
+        Attribute("metric", Some(ConceptAttribute("src" :: Nil, "attr2")), Nil) :: Nil,
+        ParentConcept(GenericConceptReference(ExpressionIdent(GenericParameter("conceptName")), Map()), Some("src"), Map(), Nil) :: Nil
+      ).genericParameters("conceptName" :: Nil).build()
+    ))
+
+    val conDef = Concept.builder(
+      "myConcept",
+      Attribute("val", Some(ConceptAttribute("s" :: Nil, "attr1")), Nil) ::
+         ConceptAttributesReference(ConstantIdent("conceptAttr"),
+           Map("conceptName" -> StringLiteral("conceptDataSource"), "src" -> StringLiteral("s"))) :: Nil,
+      ParentConcept(ConceptReference("conceptDataSource"), Some("s"), Map(), Nil) :: Nil
+    ).build()
+
+    conDef.inferAttributeExpressions(context).get should equal(
+      Concept.builder(
+        "myConcept",
+        Attribute("val", Some(ConceptAttribute("s" :: Nil, "attr1")), Nil) ::
+          Attribute("metric", Some(ConceptAttribute("s" :: Nil, "attr2")), Nil) :: Nil,
+        ParentConcept(
+          ConceptReference("conceptDataSource"), Some("s"), Map(), Nil) :: Nil
+      ).build()
+    )
+
+    context.addConcept(ConceptDefinition(
+      ConceptAttributes.builder(
+        "conceptAttr",
+        Attribute("metric", Some(ConceptAttribute(Nil, "attr2")), Nil) :: Nil,
+        ParentConcept(GenericConceptReference(ExpressionIdent(GenericParameter("conceptName")), Map()), None, Map(), Nil) :: Nil
+      ).genericParameters("conceptName" :: Nil).build()
+    ))
+    val conDef1 = Concept.builder(
+      "myConcept",
+      Attribute("val", Some(ConceptAttribute("s" :: Nil, "attr1")), Nil) ::
+        ConceptAttributesReference(ConstantIdent("conceptAttr"),
+          Map("0" -> StringLiteral("s"))) :: Nil,
+      ParentConcept(ConceptReference("conceptDataSource"), Some("s"), Map(), Nil) :: Nil
+    ).build()
+
+    conDef1.inferAttributeExpressions(context).get should equal(
+      Concept.builder(
+        "myConcept",
+        Attribute("val", Some(ConceptAttribute("s" :: Nil, "attr1")), Nil) ::
+          Attribute("metric", Some(ConceptAttribute("s" :: Nil, "attr2")), Nil) :: Nil,
+        ParentConcept(
+          ConceptReference("conceptDataSource"), Some("s"), Map(), Nil) :: Nil
+      ).build()
+    )
+  }
+
+
 }

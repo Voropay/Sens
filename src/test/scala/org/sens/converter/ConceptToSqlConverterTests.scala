@@ -1068,6 +1068,33 @@ class ConceptToSqlConverterTests extends AnyFlatSpec with Matchers {
     )
   }
 
+  "Concept Attributes definition" should "be converted to SQL correctly" in {
+    val context = ValidationContext()
+    context.addConcept(ConceptDefinition(DataSourceConcept(
+      "tablePurchase",
+      Attribute("id", None, Nil) ::
+        Attribute("productId", None, Nil) ::
+        Attribute("amount", None, Nil) ::
+        Attribute("date", None, Nil) :: Nil,
+      FileDataSource("someFile1", FileFormats.CSV),
+      Nil
+    )))
+
+    val conDef = ConceptAttributes.builder(
+      "purchaseDimensions",
+      Attribute("productId", Some(ConceptAttribute("p" :: Nil, "productId")), Nil) ::
+        Attribute("date", Some(ConceptAttribute("p" :: Nil, "date")), Nil) :: Nil,
+      ParentConcept(ConceptReference("tablePurchase"), Some("p"), Map(), Nil) :: Nil
+    ).build()
+
+    val converter = ConceptToSqlConverter.create(context)
+    val conceptSql = converter.toSql(conDef)
+    conceptSql should equal(
+      "SELECT `p`.`productId` AS `productId`, `p`.`date` AS `date`\n" +
+        "FROM `someFile1` AS `p`"
+    )
+  }
+
   "Concept definition with window functions" should "be converted to SQL correctly" in {
     val context = ValidationContext()
 

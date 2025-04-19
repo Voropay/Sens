@@ -40,3 +40,9 @@ case class AttributeNamesDoNotMatch() extends ValidationException("Attribute nam
 case class RecursiveDefinitionNotAllowedException(name: String) extends ValidationException("Recursive definition now allowed: %s".format(name))
 
 case class GenericDefinitionException(msg: String) extends ValidationException(msg)
+
+case class WrongConceptType(expected: String, found: String)
+  extends ValidationException(
+    "Wrong concept type: expected %s, found %s"
+      .format(expected, found)
+  )

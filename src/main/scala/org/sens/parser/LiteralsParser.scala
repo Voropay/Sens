@@ -67,6 +67,7 @@ trait LiteralsParser extends JavaTokenParsers {
 
   def conceptKeyword: Parser[String] = "concept\\b".r
   def conceptCubeKeyword: Parser[String] = "concept\\scube\\b".r
+  def conceptAttributesKeyword: Parser[String] = "concept\\sattributes\\b".r
   def dataSourceKeyword: Parser[String] = "datasource\\b".r
   def fromKeyword: Parser[String] = "from\\b".r
   def isKeyword: Parser[String] = "is\\b".r

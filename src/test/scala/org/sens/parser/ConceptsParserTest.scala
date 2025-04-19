@@ -14,6 +14,8 @@ import org.sens.core.expression.operation.logical.Not
 import org.sens.core.expression.operation.relational.Exists
 import org.sens.core.statement._
 
+import scala.collection.immutable.Map
+
 class ConceptsParserTest extends AnyFlatSpec with Matchers {
   val conceptParser = new SensParser
 
@@ -43,7 +45,7 @@ class ConceptsParserTest extends AnyFlatSpec with Matchers {
 
   "Attributes" should "be parsed correctly" in {
     conceptParser.parse(
-      conceptParser.attributeParser,
+      conceptParser.sensAttributeParser,
       "@NotNull, @Default(value = \"\")  myAttr"
     ).get should equal (
       Attribute(
@@ -55,7 +57,7 @@ class ConceptsParserTest extends AnyFlatSpec with Matchers {
     )
 
     conceptParser.parse(
-      conceptParser.attributeParser,
+      conceptParser.sensAttributeParser,
       "myAttr"
     ).get should equal (
       Attribute(
@@ -66,7 +68,7 @@ class ConceptsParserTest extends AnyFlatSpec with Matchers {
     )
 
     conceptParser.parse(
-      conceptParser.attributeParser,
+      conceptParser.sensAttributeParser,
       "myAttr = 1"
     ).get should equal (
       Attribute(
@@ -74,6 +76,24 @@ class ConceptsParserTest extends AnyFlatSpec with Matchers {
         Some(IntLiteral(1)),
         Nil
       )
+    )
+
+    conceptParser.parse(
+      conceptParser.sensAttributeParser,
+      "myMetrics[source: \"s\", sourceType: \"metricsList\"]"
+    ).get should equal(
+      ConceptAttributesReference(
+        ConstantIdent("myMetrics"),
+        Map("source" -> StringLiteral("s"), "sourceType" -> StringLiteral("metricsList")))
+    )
+
+    conceptParser.parse(
+      conceptParser.sensAttributeParser,
+      "$metrics[source: \"s\"]"
+    ).get should equal(
+      ConceptAttributesReference(
+        ExpressionIdent(NamedElementPlaceholder("metrics")),
+        Map("source" -> StringLiteral("s")))
     )
   }
 
@@ -353,6 +373,49 @@ class ConceptsParserTest extends AnyFlatSpec with Matchers {
     )
   }
 
+  "Concept definition with concept attributes reference" should "be parsed correctly" in {
+    conceptParser.parse(
+      conceptParser.sensConcept,
+      "concept myConcept (" +
+        "key = s.attr1, " +
+        "myMetrics[s: \"s\", sourceType: \"mySource\"]" +
+        ")\n" +
+        "from mySource s"
+    ).get should equal(
+      Concept.builder(
+        "myConcept",
+        Attribute("key", Some(ConceptAttribute("s" :: Nil, "attr1")), List()) ::
+          ConceptAttributesReference(
+            ConstantIdent("myMetrics"),
+            Map("s" -> StringLiteral("s"), "sourceType" -> StringLiteral("mySource"))) :: Nil,
+        ParentConcept(
+          ConceptReference("mySource"),
+          Some("s"), Map(), Nil) :: Nil)
+        .build
+    )
+
+    conceptParser.parse(
+      conceptParser.sensConcept,
+      "concept myConcept [sourceName] (" +
+        "key = s.attr1, " +
+        "myMetrics[s: \"s\", sourceType: sourceName]" +
+        ")\n" +
+        "from $sourceName s"
+    ).get should equal(
+      Concept.builder(
+        "myConcept",
+        Attribute("key", Some(ConceptAttribute("s" :: Nil, "attr1")), List()) ::
+          ConceptAttributesReference(
+            ConstantIdent("myMetrics"),
+            Map("s" -> StringLiteral("s"), "sourceType" -> NamedElementPlaceholder("sourceName"))) :: Nil,
+        ParentConcept(
+          GenericConceptReference(ExpressionIdent(NamedElementPlaceholder("sourceName")), Map()),
+          Some("s"), Map(), Nil) :: Nil)
+        .genericParameters("sourceName" :: Nil)
+        .build
+    )
+  }
+
   "Cube Concept definition" should "be parsed correctly" in {
     conceptParser.parse(
       conceptParser.sensConcept,
@@ -432,6 +495,25 @@ class ConceptsParserTest extends AnyFlatSpec with Matchers {
         Some(20),
         Annotation("Owner", Map("name" -> StringLiteral("Al1"))) :: Nil
       )
+    )
+  }
+
+  "Cube Concept definition with ConceptAttributesReference" should "be parsed correctly" in {
+    conceptParser.parse(
+      conceptParser.sensConcept,
+        "concept cube myCube metrics (" +
+        "metricsList [src: \"s\"]" +
+        ") dimensions (" +
+        "dimensionsList [src: \"s\"]" +
+        ")\n" +
+        "from someFactConcept c"
+    ).get should equal(
+      CubeConcept.builder(
+        "myCube",
+        ConceptAttributesReference(ConstantIdent("metricsList"), Map("src" -> StringLiteral("s"))) :: Nil,
+        ConceptAttributesReference(ConstantIdent("dimensionsList"), Map("src" -> StringLiteral("s"))) :: Nil,
+        ParentConcept(ConceptReference("someFactConcept"), Some("c"), Map(), Nil) :: Nil
+      ).build()
     )
   }
 
@@ -535,6 +617,30 @@ class ConceptsParserTest extends AnyFlatSpec with Matchers {
         ParentConcept(ConceptReference("parentConcept1"), Some("c1"), Map(), Nil) ::
         ParentConcept(ConceptReference("parentConcept2"), Some("c2"), Map("id" -> ConceptAttribute("c1" :: Nil, "parentId")), Nil) :: Nil)
         .build
+    )
+  }
+
+  "Concept attributes definition" should "be parsed correctly" in {
+    conceptParser.parse(
+      conceptParser.sensConcept,
+      "@Owner(name = \"Al1\")" +
+        "concept attributes myMetrics (totalVal = sum(s.val), avgVal = avg(s.val))\n" +
+        "from sourceConcept s"
+    ).get should equal(
+      ConceptAttributes(
+        "myMetrics",
+        Nil,
+        Attribute("totalVal", Some(
+          FunctionCall(FunctionReference("sum"), ConceptAttribute("s" :: Nil, "val") :: Nil)),
+          Nil
+        ) ::
+          Attribute("avgVal", Some(
+            FunctionCall(FunctionReference("avg"), ConceptAttribute("s" :: Nil, "val") :: Nil)),
+            Nil
+          ) :: Nil,
+        ParentConcept(ConceptReference("sourceConcept"), Some("s"), Map(),  Nil) :: Nil,
+        Annotation("Owner", Map("name" -> StringLiteral("Al1"))) :: Nil
+      )
     )
   }
 

@@ -190,4 +190,60 @@ class CLITests extends AnyFlatSpec with Matchers {
         |FROM `_generic_adStats_campaign_meta_ads` AS `_generic_adStats_campaign_meta_ads`
         |WHERE `_generic_adStats_campaign_meta_ads`.`date` = '2024-01-01')""".stripMargin)
   }
+
+  val conceptAttributesProgram =
+    """
+      |datasource campaign_ads(
+      |  campaign_id,
+      |  date,
+      |  impressions,
+      |  clicks,
+      |  cost
+      |) from CSV file "ppc.csv";
+      |
+      |concept attributes adCampaignMetrics [sourceName] (
+      |  cost = sum(s.cost),
+      |  clicks = sum(s.clicks),
+      |  impressions = sum(s.impressions),
+      |  cpc = sum(s.cost) / sum(s.clicks),
+      |  ctr = 100 * (sum(s.clicks) / sum(s.impressions))
+      |) from $sourceName s;
+      |
+      |@Materialized (type = "Table")
+      |concept adStatsByCampaign (
+      |  adCampaignMetrics[sourceName: "campaign_ads", s: "ca"],
+      |  campaign_id,
+      |  date
+      |) from campaign_ads ca
+      |group by campaign_id, date;
+      |
+      |@Materialized (type = "Table")
+      |concept adStatsDaily (
+      |  adCampaignMetrics[sourceName: "adStatsByCampaign", s: "ca"],
+      |  date
+      |) from adStatsByCampaign ca
+      |group by date;
+      |""".stripMargin
+
+  "Concept Attributes Program" should "be materialized correctly" in {
+    val conceptParser = new SensParser
+
+    val parsingResults = MainApp.parseDataModel(conceptAttributesProgram, conceptParser)
+    parsingResults.isRight should be(true)
+    val context = parsingResults.right.get
+    context.getConcepts.size should equal(4)
+
+    val sqlCode = MainApp.materialize(context)
+    sqlCode should equal(
+      """DROP TABLE IF EXISTS `adStatsByCampaign`;
+        |CREATE TABLE `adStatsByCampaign` AS
+        |SELECT SUM(`ca`.`cost`) AS `cost`, SUM(`ca`.`clicks`) AS `clicks`, SUM(`ca`.`impressions`) AS `impressions`, SUM(`ca`.`cost`) / SUM(`ca`.`clicks`) AS `cpc`, 100 * (SUM(`ca`.`clicks`) / SUM(`ca`.`impressions`)) AS `ctr`, `ca`.`campaign_id` AS `campaign_id`, `ca`.`date` AS `date`
+        |FROM `ppc.csv` AS `ca`
+        |GROUP BY `campaign_id`, `date`;
+        |DROP TABLE IF EXISTS `adStatsDaily`;
+        |CREATE TABLE `adStatsDaily` AS
+        |SELECT SUM(`ca`.`cost`) AS `cost`, SUM(`ca`.`clicks`) AS `clicks`, SUM(`ca`.`impressions`) AS `impressions`, SUM(`ca`.`cost`) / SUM(`ca`.`clicks`) AS `cpc`, 100 * (SUM(`ca`.`clicks`) / SUM(`ca`.`impressions`)) AS `ctr`, `ca`.`date` AS `date`
+        |FROM `adStatsByCampaign` AS `ca`
+        |GROUP BY `date`;""".stripMargin)
+  }
 }

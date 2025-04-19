@@ -159,6 +159,22 @@ class ConceptOperationsTests extends AnyFlatSpec with Matchers {
     gcr.replaceSubExpression(GenericParameter("paramVal"), StringLiteral("someVal")) should equal(
       GenericConceptReference(ExpressionIdent(GenericParameter("name")), Map("param" -> StringLiteral("someVal")))
     )
+
+    val car = ConceptAttributesReference(ExpressionIdent(GenericParameter("name")), Map("source" -> GenericParameter("s")))
+    car.getSubExpressions should equal(GenericParameter("s") :: Nil)
+    car.findSubExpression(_ == BooleanLiteral(false)) should equal(None)
+    car.findSubExpression(_ == GenericParameter("name")) should equal(Some(GenericParameter("name")))
+    car.findSubExpression(_ == GenericParameter("s")) should equal(Some(GenericParameter("s")))
+    car.findAllSubExpressions(_ == BooleanLiteral(false)) should equal(Nil)
+    car.findAllSubExpressions(_ == GenericParameter("name")) should equal(List(GenericParameter("name")))
+    car.findAllSubExpressions(_ == GenericParameter("s")) should equal(List(GenericParameter("s")))
+    car.replaceSubExpression(BooleanLiteral(false), StringLiteral("value")) should equal(car)
+    car.replaceSubExpression(GenericParameter("name"), StringLiteral("name")) should equal(
+      ConceptAttributesReference(ExpressionIdent(StringLiteral("name")), Map("source" -> GenericParameter("s")))
+    )
+    car.replaceSubExpression(GenericParameter("s"), StringLiteral("p")) should equal(
+      ConceptAttributesReference(ExpressionIdent(GenericParameter("name")), Map("source" -> StringLiteral("p")))
+    )
   }
 
   "Concept" should "work with subexpressions correctly" in {
@@ -592,6 +608,42 @@ class ConceptOperationsTests extends AnyFlatSpec with Matchers {
     )
     uc.replaceSubExpression(StringLiteral("view"), StringLiteral("ephemeral")) should equal(
       uc.copy(annotations = Annotation("Materialized", Map("type" -> StringLiteral("ephemeral"))) :: Nil)
+    )
+  }
+
+  "ConceptAttributes concept" should "work with subexpressions correctly" in {
+    val ca = ConceptAttributes(
+      "attrList",
+      Nil,
+      Attribute("category", Some(ConceptAttribute("s" :: Nil, "category")), Nil) ::
+        Attribute("country", Some(ConceptAttribute("s" :: Nil, "country")), Nil) :: Nil,
+      ParentConcept(ConceptReference("source"), Some("s"), Map(), Nil) :: Nil,
+      Annotation("Description", Map("text" -> StringLiteral("Group by columns"))) :: Nil
+    )
+
+    ca.getSubExpressions should equal (Nil)
+
+    ca.findSubExpression(_ == BooleanLiteral(false)) should equal(None)
+    ca.findSubExpression(_ == ConceptAttribute("s" :: Nil, "category")) should equal(Some(ConceptAttribute("s" :: Nil, "category")))
+    ca.findSubExpression(_ == ConceptReference("source")) should equal(Some(ConceptReference("source")))
+    ca.findSubExpression(_ == StringLiteral("Group by columns")) should equal(Some(StringLiteral("Group by columns")))
+
+    ca.findAllSubExpressions(_ == BooleanLiteral(false)) should equal(Nil)
+    ca.findAllSubExpressions(_ == ConceptAttribute("s" :: Nil, "category")) should equal(List(ConceptAttribute("s" :: Nil, "category")))
+    ca.findAllSubExpressions(_ == ConceptReference("source")) should equal(List(ConceptReference("source")))
+    ca.findAllSubExpressions(_ == StringLiteral("Group by columns")) should equal(List(StringLiteral("Group by columns")))
+
+    ca.replaceSubExpression(BooleanLiteral(false), StringLiteral("value")) should equal(ca)
+    ca.replaceSubExpression(ConceptAttribute("s" :: Nil, "category"), ConceptAttribute("p" :: Nil, "category")) should equal(
+      ca.copy(
+        attributes = Attribute("category", Some(ConceptAttribute("p" :: Nil, "category")), Nil) ::
+          Attribute("country", Some(ConceptAttribute("s" :: Nil, "country")), Nil) :: Nil)
+    )
+    ca.replaceSubExpression(ConceptReference("source"), ConceptReference("source1")) should equal(
+      ca.copy(parentConcepts = ParentConcept(ConceptReference("source1"), Some("s"), Map(), Nil) :: Nil)
+    )
+    ca.replaceSubExpression(StringLiteral("Group by columns"), StringLiteral("Dimension keys")) should equal(
+      ca.copy(annotations = Annotation("Description", Map("text" -> StringLiteral("Dimension keys"))) :: Nil)
     )
   }
 

@@ -6,8 +6,8 @@ import org.sens.parser.ValidationContext
 import scala.util.Try
 
 case class CubeConcept (name: String,
-                        metrics: List[Attribute],
-                        dimensions: List[Attribute],
+                        metrics: List[SensAttribute],
+                        dimensions: List[SensAttribute],
                         parentConcepts: List[ParentConcept],
                         attributeDependencies: Option[SensExpression],
                         groupDependencies: Option[SensExpression],
@@ -56,11 +56,11 @@ case class CubeConcept (name: String,
   }
 
   override def getAttributeNames(context: ValidationContext): List[String] = {
-    metrics.map(_.name) ::: dimensions.map(_.name)
+    composeAttributes(metrics, context).map(_.name) ::: composeAttributes(dimensions, context).map(_.name)
   }
 
   override def getAttributes(context: ValidationContext): List[Attribute] = {
-    metrics ::: dimensions
+    composeAttributes(metrics, context) ::: composeAttributes(dimensions, context)
   }
 
   override def getCurrentAttributes(context: ValidationContext): List[Attribute] = getAttributes(context)
@@ -99,9 +99,9 @@ case class CubeConcept (name: String,
     ))
   }
 
-  override def getMetrics(context: ValidationContext): List[Attribute] = metrics
+  override def getMetrics(context: ValidationContext): List[Attribute] = composeAttributes(metrics, context)
 
-  override def getDimensions(context: ValidationContext): List[Attribute] = dimensions
+  override def getDimensions(context: ValidationContext): List[Attribute] = composeAttributes(dimensions, context)
 
   override def toCubeConcept(context: ValidationContext): CubeConcept = this
 
@@ -110,12 +110,14 @@ case class CubeConcept (name: String,
   }
 
   override def toConcept(context: ValidationContext): Concept = {
+    val composedMetrics = composeAttributes(metrics, context)
+    val composedDimensions = composeAttributes(dimensions, context)
     Concept(name,
       Nil,
-      metrics ::: dimensions,
+      composedMetrics ::: composedDimensions,
       parentConcepts,
       attributeDependencies,
-      dimensions.map(attr => ConceptAttribute(Nil, attr.name)),
+      composedDimensions.map(attr => ConceptAttribute(Nil, attr.name)),
       groupDependencies,
       orderByAttributes,
       limit,
@@ -127,8 +129,8 @@ case class CubeConcept (name: String,
 
 object CubeConcept {
   def builder(name: String,
-              metrics: List[Attribute],
-              dimensions: List[Attribute],
+              metrics: List[SensAttribute],
+              dimensions: List[SensAttribute],
               parentConcepts: List[ParentConcept]
              ): CubeConceptBuilder = {
     new CubeConceptBuilder(name, metrics, dimensions, parentConcepts)
@@ -136,8 +138,8 @@ object CubeConcept {
 }
 
 class CubeConceptBuilder(name: String,
-                         metrics: List[Attribute],
-                         dimensions: List[Attribute],
+                         metrics: List[SensAttribute],
+                         dimensions: List[SensAttribute],
                          parentConcepts: List[ParentConcept]) {
   var attributeDependencies: Option[SensExpression] = None
   var groupDependencies: Option[SensExpression] = None

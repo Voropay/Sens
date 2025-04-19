@@ -10,7 +10,7 @@ import org.sens.core.statement.StatementBlock
 trait ConceptParser extends StatementsParser {
 
   override def sensConcept: Parser[SensConcept] = functionConceptDefinition | conceptDefinition | cubeConceptDefinition | cubeInheritedConceptDefinition | inheritedConceptDefinition |
-    relationshipConceptDefinition | dataSourceConceptDefinition | unionConceptDefinition | intersectConceptDefinition | minusConceptDefinition
+    relationshipConceptDefinition | conceptAttributesDefinition | dataSourceConceptDefinition | unionConceptDefinition | intersectConceptDefinition | minusConceptDefinition
 
   def annotationParser: Parser[Annotation] = "@" ~ sensIdent ~ opt("(" ~ repsep(annotationKeyValuePair, ",") ~ ")") ^^ {
     case "@" ~ name ~ values  => {
@@ -31,6 +31,8 @@ trait ConceptParser extends StatementsParser {
       Order(value._1, direction)
     }
   }
+
+  def sensAttributeParser: Parser[SensAttribute] = conceptAttributesReference | attributeParser
 
   def attributeParser: Parser[Attribute] = repsep(annotationParser, ",") ~ sensIdent ~ opt("=" ~> sensExpression) ^^ {value =>
     Attribute(value._1._2, value._2, value._1._1)
@@ -76,6 +78,10 @@ trait ConceptParser extends StatementsParser {
   def constantIdent: Parser[ConstantIdent] = sensIdent ^^ {value => ConstantIdent(value)}
 
   def expressionIdent: Parser[ExpressionIdent] = "$" ~ sensExpression ^^ {value => ExpressionIdent(value._2)}
+
+  def conceptAttributesReference: Parser[SensAttribute] = sensConceptIdent ~ paramsExpression ^^ {
+    case conceptIdent ~ paramsMap => ConceptAttributesReference(conceptIdent, paramsMap)
+  }
 
   def anonymousConceptExpression: Parser[AnonymousConceptDefinition] =
     "<" ~
@@ -127,7 +133,7 @@ trait ConceptParser extends StatementsParser {
     conceptKeyword ~
     sensIdent ~
     opt("[" ~ rep1sep(sensIdent, ",") ~ "]") ~
-    "(" ~ rep1sep(attributeParser, ",") ~ ")" ~
+    "(" ~ rep1sep(sensAttributeParser, ",") ~ ")" ~
     fromKeyword ~ rep1sep(parentConceptParser, ",") ~
     opt(whereKeyword ~> sensExpression) ~
     opt(groupByKeyword ~> rep1sep(sensExpression, ",") ~ opt(havingKeyword ~> sensExpression)) ~
@@ -210,8 +216,8 @@ trait ConceptParser extends StatementsParser {
     repsep(annotationParser, ",") ~
       conceptCubeKeyword ~
       sensIdent ~
-      metricsKeyword ~ "(" ~ rep1sep(attributeParser, ",") ~ ")" ~
-      opt(dimensionsKeyword ~> "(" ~ rep1sep(attributeParser, ",") ~ ")") ~
+      metricsKeyword ~ "(" ~ rep1sep(sensAttributeParser, ",") ~ ")" ~
+      opt(dimensionsKeyword ~> "(" ~ rep1sep(sensAttributeParser, ",") ~ ")") ~
       fromKeyword ~ rep1sep(parentConceptParser, ",") ~
       opt(whereKeyword ~> sensExpression) ~
       opt(havingKeyword ~> sensExpression) ~
@@ -306,6 +312,29 @@ trait ConceptParser extends StatementsParser {
           whereExpr,
           annotations
         )
+    }
+
+  def conceptAttributesDefinition: Parser[ConceptAttributes] =
+    repsep(annotationParser, ",") ~
+      conceptAttributesKeyword ~
+      sensIdent ~
+      opt("[" ~ rep1sep(sensIdent, ",") ~ "]") ~
+      "(" ~ rep1sep(sensAttributeParser, ",") ~ ")" ~
+      fromKeyword ~ rep1sep(parentConceptParser, ",") ^^ {
+      case
+        annotations ~
+          "concept attributes" ~ name ~
+          genericParams ~
+          "(" ~ attributes ~ ")" ~
+          "from" ~ parentConcepts => {
+        ConceptAttributes(
+          name,
+          genericParams.map(_._1._2).getOrElse(Nil),
+          attributes,
+          parentConcepts,
+          annotations
+        )
+      }
     }
 
   def functionConceptDefinition: Parser[FunctionConcept] =
