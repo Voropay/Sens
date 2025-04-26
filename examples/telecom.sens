@@ -54,6 +54,7 @@ concept attributes dimensionsList[source] (
   client_id, client_phone_number, technology_name, cluster_name, zone_name, territory_name, actionDay)
 from $source src;
 
+@Materialized (type = "Incremental", strategy = "InsertDelete", uniqueKey = "actionDay", operator = "in")
 concept cube internetUsageMetrics metrics (
   dataBytesTotal = sum(il.upload_bytes_count + il.download_bytes_count),
   timeTotal = sum(il.upload_time_millis + il.download_time_millis),
@@ -62,49 +63,48 @@ concept cube internetUsageMetrics metrics (
 ) dimensions (dimensionsList[src: "il"]
 ) from logDimensions[source: "internet_usage_log"] il;
 
+@Materialized (type = "Incremental", strategy = "InsertDelete", uniqueKey = "actionDay", operator = "in")
 concept cube callsMetrics metrics (
   lostPackets = sum(cl.lost_packets_count)
 ) dimensions (dimensionsList[src: "cl"]
 ) from logDimensions[source: "calls_log"] cl;
 
+@Materialized (type = "Incremental", strategy = "InsertDelete", uniqueKey = "actionDay", operator = "in")
 concept cube cellConnectionMetrics metrics (
-  leadTimestamp = coalesce(
+  @Private leadTimestamp = coalesce(
     lead(ccl.action_time) over (
       partition by (ccl.client_id, ccl.client_phone_number, ccl.actionDay)
       order by (ccl.client_id asc, ccl.action_time asc)
     ),
     ccl.action_time
   ),
-  fillForwardTimeSpentAtSite = round((max(leadTimestamp) - min(ccl.action_time)) / 60),
+  @Private fillForwardTimeSpentAtSite = round((max(leadTimestamp) - min(ccl.action_time)) / 60),
   timeSpentAtSite = if fillForwardTimeSpentAtSite <= 0 then 5 else fillForwardTimeSpentAtSite
 ) dimensions (dimensionsList[src: "ccl"]
 ) from logDimensions[source: "cell_connection_log"] ccl;
 
-@Materialized (type = "Incremental", strategy = "InsertDelete", uniqueKey = "actionDay", operator = "in")
-concept cube internetUsageMetricsUnion is internetUsageMetrics with metrics
+concept internetUsageMetricsUnion is internetUsageMetrics with
   lostInternetPackets = lostPackets,
   lostCallPackets = Null,
   timeSpentAtSite = Null
-without metrics lostPackets;
+without lostPackets;
 
-@Materialized (type = "Incremental", strategy = "InsertDelete", uniqueKey = "actionDay", operator = "in")
-concept cube callsMetricsUnion is callsMetrics with metrics
+concept callsMetricsUnion is callsMetrics with
   lostCallPackets = lostPackets,
   lostInternetPackets = Null,
   timeSpentAtSite = Null,
   dataBytesTotal = Null,
   timeTotal = Null,
   packetsTotal = Null
-without metrics lostPackets;
+without lostPackets;
 
-@Materialized (type = "Incremental", strategy = "InsertDelete", uniqueKey = "actionDay", operator = "in")
-concept cube cellConnectionMetricsUnion is cellConnectionMetrics with metrics
+concept cellConnectionMetricsUnion is cellConnectionMetrics with
   lostCallPackets = Null,
   lostInternetPackets = Null,
   dataBytesTotal = Null,
   timeTotal = Null,
   packetsTotal = Null
-without metrics leadTimestamp, fillForwardTimeSpentAtSite;
+without leadTimestamp, fillForwardTimeSpentAtSite;
 
 concept customerBehaviorMetricsUnion union of internetUsageMetricsUnion, callsMetricsUnion, cellConnectionMetricsUnion;
 

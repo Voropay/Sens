@@ -9,7 +9,7 @@ import org.sens.core.datasource.{FileDataSource, FileFormats}
 import org.sens.core.expression.ConceptAttribute
 import org.sens.core.expression.concept.ConceptReference
 import org.sens.core.expression.literal.{IntLiteral, StringLiteral}
-import org.sens.core.expression.operation.arithmetic.Add
+import org.sens.core.expression.operation.arithmetic.{Add, Multiply}
 import org.sens.core.expression.operation.comparison.{Equals, GreaterThan}
 import org.sens.core.expression.operation.logical.And
 import org.sens.core.statement.ConceptDefinition
@@ -187,11 +187,13 @@ class ConceptSqlMaterializerTests extends AnyFlatSpec with Matchers {
 
     val conDef = Concept.builder("conceptA",
       Attribute("id", Some(ConceptAttribute("cb" :: Nil, "attr1")), Nil) ::
-        Attribute("val", Some(Add(ConceptAttribute("cb" :: Nil, "attr2"), ConceptAttribute("cb" :: Nil, "attr3"))), Nil) ::
+        Attribute("amount", Some(ConceptAttribute("cb" :: Nil, "attr2")), Annotation.PRIVATE :: Nil) ::
+        Attribute("price", Some(ConceptAttribute("cb" :: Nil, "attr3")), Annotation.PRIVATE :: Nil) ::
+        Attribute("value", Some(Multiply(ConceptAttribute(Nil, "amount"), ConceptAttribute(Nil, "price"))), Nil) ::
         Attribute("date", Some(ConceptAttribute("cb" :: Nil, "attr4")), Nil) :: Nil,
       ParentConcept(ConceptReference("conceptB"), Some("cb"), Map(), Nil) :: Nil)
       .attributeDependencies(And(
-        Equals(ConceptAttribute(Nil, "val"), IntLiteral(1)),
+        Equals(ConceptAttribute(Nil, "value"), IntLiteral(1)),
         GreaterThan(ConceptAttribute("cb" :: Nil, "attr4"), IntLiteral(0))
       ))
       .annotations(new Annotation(
@@ -211,18 +213,18 @@ class ConceptSqlMaterializerTests extends AnyFlatSpec with Matchers {
     materializer.materializeSql(conDef, false) should equal(
       """DELETE FROM `conceptA`
         |WHERE `date` = CURRENT_DATE;
-        |INSERT INTO `conceptA` (`id`, `val`, `date`)
-        |(SELECT `cb`.`attr1` AS `id`, `cb`.`attr2` + `cb`.`attr3` AS `val`, `cb`.`attr4` AS `date`
+        |INSERT INTO `conceptA` (`id`, `value`, `date`)
+        |(SELECT `cb`.`attr1` AS `id`, `cb`.`attr2` * `cb`.`attr3` AS `value`, `cb`.`attr4` AS `date`
         |FROM `someFile` AS `cb`
-        |WHERE `date` = CURRENT_DATE AND (`val` = 1 AND `cb`.`attr4` > 0));""".stripMargin
+        |WHERE `date` = CURRENT_DATE AND (`value` = 1 AND `cb`.`attr4` > 0));""".stripMargin
     )
 
     materializer.materializeSql(conDef) should equal(
       """DROP TABLE IF EXISTS `conceptA`;
         |CREATE TABLE `conceptA` AS
-        |SELECT `cb`.`attr1` AS `id`, `cb`.`attr2` + `cb`.`attr3` AS `val`, `cb`.`attr4` AS `date`
+        |SELECT `cb`.`attr1` AS `id`, `cb`.`attr2` * `cb`.`attr3` AS `value`, `cb`.`attr4` AS `date`
         |FROM `someFile` AS `cb`
-        |WHERE `val` = 1 AND `cb`.`attr4` > 0;""".stripMargin
+        |WHERE `value` = 1 AND `cb`.`attr4` > 0;""".stripMargin
     )
   }
 
@@ -240,11 +242,13 @@ class ConceptSqlMaterializerTests extends AnyFlatSpec with Matchers {
 
     val conDef = Concept.builder("conceptA",
       Attribute("id", Some(ConceptAttribute("cb" :: Nil, "attr1")), Nil) ::
-        Attribute("val", Some(Add(ConceptAttribute("cb" :: Nil, "attr2"), ConceptAttribute("cb" :: Nil, "attr3"))), Nil) ::
+        Attribute("amount", Some(ConceptAttribute("cb" :: Nil, "attr2")), Annotation.PRIVATE :: Nil) ::
+        Attribute("price", Some(ConceptAttribute("cb" :: Nil, "attr3")), Annotation.PRIVATE :: Nil) ::
+        Attribute("value", Some(Multiply(ConceptAttribute(Nil, "amount"), ConceptAttribute(Nil, "price"))), Nil) ::
         Attribute("date", Some(ConceptAttribute("cb" :: Nil, "attr4")), Nil) :: Nil,
       ParentConcept(ConceptReference("conceptB"), Some("cb"), Map(), Nil) :: Nil)
       .attributeDependencies(And(
-        Equals(ConceptAttribute(Nil, "val"), IntLiteral(1)),
+        Equals(ConceptAttribute(Nil, "value"), IntLiteral(1)),
         GreaterThan(ConceptAttribute("cb" :: Nil, "attr4"), IntLiteral(0))
       ))
       .annotations(new Annotation(
@@ -261,10 +265,10 @@ class ConceptSqlMaterializerTests extends AnyFlatSpec with Matchers {
 
     val materializer = ConceptSqlMaterializer.create(context)
     materializer.materializeSql(conDef, false, Some(IntLiteral(123456789))) should equal(
-      """INSERT INTO `conceptA` (`id`, `val`, `date`)
-        |(SELECT `cb`.`attr1` AS `id`, `cb`.`attr2` + `cb`.`attr3` AS `val`, `cb`.`attr4` AS `date`
+      """INSERT INTO `conceptA` (`id`, `value`, `date`)
+        |(SELECT `cb`.`attr1` AS `id`, `cb`.`attr2` * `cb`.`attr3` AS `value`, `cb`.`attr4` AS `date`
         |FROM `someFile` AS `cb`
-        |WHERE `date` > 123456789 AND (`val` = 1 AND `cb`.`attr4` > 0));""".stripMargin
+        |WHERE `date` > 123456789 AND (`value` = 1 AND `cb`.`attr4` > 0));""".stripMargin
     )
   }
 
@@ -282,11 +286,13 @@ class ConceptSqlMaterializerTests extends AnyFlatSpec with Matchers {
 
     val conDef = Concept.builder("conceptA",
       Attribute("id", Some(ConceptAttribute("cb" :: Nil, "attr1")), Nil) ::
-        Attribute("val", Some(Add(ConceptAttribute("cb" :: Nil, "attr2"), ConceptAttribute("cb" :: Nil, "attr3"))), Nil) ::
+        Attribute("amount", Some(ConceptAttribute("cb" :: Nil, "attr2")), Annotation.PRIVATE :: Nil) ::
+        Attribute("price", Some(ConceptAttribute("cb" :: Nil, "attr3")), Annotation.PRIVATE :: Nil) ::
+        Attribute("value", Some(Multiply(ConceptAttribute(Nil, "amount"), ConceptAttribute(Nil, "price"))), Nil) ::
         Attribute("date", Some(ConceptAttribute("cb" :: Nil, "attr4")), Nil) :: Nil,
       ParentConcept(ConceptReference("conceptB"), Some("cb"), Map(), Nil) :: Nil)
       .attributeDependencies(And(
-        Equals(ConceptAttribute(Nil, "val"), IntLiteral(1)),
+        Equals(ConceptAttribute(Nil, "value"), IntLiteral(1)),
         GreaterThan(ConceptAttribute("cb" :: Nil, "attr4"), IntLiteral(0))
       ))
       .annotations(new Annotation(
@@ -304,12 +310,12 @@ class ConceptSqlMaterializerTests extends AnyFlatSpec with Matchers {
     val materializer = ConceptSqlMaterializer.create(context)
     materializer.materializeSql(conDef, false, Some(IntLiteral(123456789))) should equal(
       s"""MERGE INTO `conceptA` AS `sens_merge_target`
-         |USING (SELECT `cb`.`attr1` AS `id`, `cb`.`attr2` + `cb`.`attr3` AS `val`, `cb`.`attr4` AS `date`
+         |USING (SELECT `cb`.`attr1` AS `id`, `cb`.`attr2` * `cb`.`attr3` AS `value`, `cb`.`attr4` AS `date`
          |FROM `someFile` AS `cb`
-         |WHERE `date` > 123456789 AND (`val` = 1 AND `cb`.`attr4` > 0)) AS `sens_merge_source`
+         |WHERE `date` > 123456789 AND (`value` = 1 AND `cb`.`attr4` > 0)) AS `sens_merge_source`
          |ON `sens_merge_source`.`date` = `sens_merge_target`.`date`
-         |WHEN MATCHED THEN UPDATE SET `sens_merge_target`.`id` = `sens_merge_source`.`id`, `sens_merge_target`.`val` = `sens_merge_source`.`val`
-         |WHEN NOT MATCHED THEN INSERT (`id`, `val`, `date`) (VALUES(`sens_merge_source`.`id`, `sens_merge_source`.`val`, `sens_merge_source`.`date`));""".stripMargin
+         |WHEN MATCHED THEN UPDATE SET `sens_merge_target`.`id` = `sens_merge_source`.`id`, `sens_merge_target`.`value` = `sens_merge_source`.`value`
+         |WHEN NOT MATCHED THEN INSERT (`id`, `value`, `date`) (VALUES(`sens_merge_source`.`id`, `sens_merge_source`.`value`, `sens_merge_source`.`date`));""".stripMargin
     )
   }
 
@@ -327,11 +333,13 @@ class ConceptSqlMaterializerTests extends AnyFlatSpec with Matchers {
 
     val conDef = Concept.builder("conceptA",
       Attribute("id", Some(ConceptAttribute("cb" :: Nil, "attr1")), Nil) ::
-        Attribute("val", Some(Add(ConceptAttribute("cb" :: Nil, "attr2"), ConceptAttribute("cb" :: Nil, "attr3"))), Nil) ::
+        Attribute("amount", Some(ConceptAttribute("cb" :: Nil, "attr2")), Annotation.PRIVATE :: Nil) ::
+        Attribute("price", Some(ConceptAttribute("cb" :: Nil, "attr3")), Annotation.PRIVATE :: Nil) ::
+        Attribute("value", Some(Multiply(ConceptAttribute(Nil, "amount"), ConceptAttribute(Nil, "price"))), Nil) ::
         Attribute("date", Some(ConceptAttribute("cb" :: Nil, "attr4")), Nil) :: Nil,
       ParentConcept(ConceptReference("conceptB"), Some("cb"), Map(), Nil) :: Nil)
       .attributeDependencies(And(
-        Equals(ConceptAttribute(Nil, "val"), IntLiteral(1)),
+        Equals(ConceptAttribute(Nil, "value"), IntLiteral(1)),
         GreaterThan(ConceptAttribute("cb" :: Nil, "attr4"), IntLiteral(0))
       ))
       .annotations(new Annotation(
@@ -349,16 +357,16 @@ class ConceptSqlMaterializerTests extends AnyFlatSpec with Matchers {
     val materializer = ConceptSqlMaterializer.create(context)
     materializer.materializeSql(conDef, false, Some(IntLiteral(123456789))) should equal(
       s"""MERGE `conceptA` AS `sens_merge_target`
-         |USING (SELECT `cb`.`attr1` AS `id`, `cb`.`attr2` + `cb`.`attr3` AS `val`, `cb`.`attr4` AS `date`
+         |USING (SELECT `cb`.`attr1` AS `id`, `cb`.`attr2` * `cb`.`attr3` AS `value`, `cb`.`attr4` AS `date`
          |FROM `someFile` AS `cb`
-         |WHERE `date` > 123456789 AND (`val` = 1 AND `cb`.`attr4` > 0)) AS `sens_merge_source`
+         |WHERE `date` > 123456789 AND (`value` = 1 AND `cb`.`attr4` > 0)) AS `sens_merge_source`
          |ON `sens_merge_source`.`date` = `sens_merge_target`.`date`
          |AND `sens_merge_target`.`date` > 123456789
          |WHEN NOT MATCHED BY TARGET THEN
-         |INSERT (`id`, `val`, `date`)
-         |VALUES(`sens_merge_source`.`id`, `sens_merge_source`.`val`, `sens_merge_source`.`date`)
+         |INSERT (`id`, `value`, `date`)
+         |VALUES(`sens_merge_source`.`id`, `sens_merge_source`.`value`, `sens_merge_source`.`date`)
          |WHEN MATCHED THEN UPDATE SET
-         |(`sens_merge_target`.`id` = `sens_merge_source`.`id`, `sens_merge_target`.`val` = `sens_merge_source`.`val`)
+         |(`sens_merge_target`.`id` = `sens_merge_source`.`id`, `sens_merge_target`.`value` = `sens_merge_source`.`value`)
          |WHEN NOT MATCHED BY SOURCE
          |AND `sens_merge_target`.`date` > 123456789
          |THEN DELETE;""".stripMargin

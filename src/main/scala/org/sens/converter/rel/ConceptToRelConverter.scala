@@ -51,7 +51,7 @@ class ConceptToRelConverter(context: ValidationContext, config: FrameworkConfig,
     validationContext.setCurrentConcept(concept)
     concept match {
       case conceptDef: Concept => {
-        prepareQuery(conceptDef, relBuilder, numberOfTables)
+        prepareQuery(conceptDef.inferAttributeExpressions(validationContext).get, relBuilder, numberOfTables)
       }
       case cubeDef: CubeConcept => {
         val conceptDef = cubeDef.inferAttributeExpressions(validationContext).get
@@ -118,7 +118,7 @@ class ConceptToRelConverter(context: ValidationContext, config: FrameworkConfig,
     val conceptAttributes = concept.attributes.map {
       case a: Attribute => a
       case _ => throw new ValidationException("Attribute values must be inferred")
-    }
+    }.filter(curAttr => !curAttr.annotations.contains(Annotation.PRIVATE))
     val joins = prepareJoins(concept.parentConcepts, conceptAttributes, relBuilder, numberOfTables)
     val filters = prepareFilters(concept.attributeDependencies, conceptAttributes, joins, numberOfTables)
     val projections = if(isAggregateConcept(concept)) {

@@ -172,7 +172,9 @@ class ConceptSqlMaterializer(context: ValidationContext, config: FrameworkConfig
     val conditionNode = composer.sqlConverter.expressionConverter.sensExpressionToSqlNode(condition)
     val deleteStmt = new SqlDelete(SqlParserPos.ZERO, tableId, conditionNode, null, null)
     val source = composer.composeToSqlNode(concept)
-    val columnList = concept.getAttributeNames(context).map(curName => new SqlIdentifier(List(curName).asJava, SqlParserPos.ZERO))
+    val columnList = concept.getAttributes(context)
+      .filter(curAttr => !curAttr.annotations.contains(Annotation.PRIVATE))
+      .map(curAttr => new SqlIdentifier(List(curAttr.name).asJava, SqlParserPos.ZERO))
     val columnListNode = new SqlNodeList(columnList.asJava, SqlParserPos.ZERO)
     val insertStmt = new SqlInsert(SqlParserPos.ZERO, SqlNodeList.EMPTY, tableId, source, columnListNode)
     composer.sqlConverter.expressionConverter.toSql(deleteStmt) + ";\n" + composer.sqlConverter.expressionConverter.toSql(insertStmt) + ";"
@@ -181,7 +183,9 @@ class ConceptSqlMaterializer(context: ValidationContext, config: FrameworkConfig
   def insertTable(materializationName: String, concept: SensConcept): String = {
     val tableId = new SqlIdentifier(List(materializationName).asJava, SqlParserPos.ZERO)
     val source = composer.composeToSqlNode(concept)
-    val columnList = concept.getAttributeNames(context).map(curName => new SqlIdentifier(List(curName).asJava, SqlParserPos.ZERO))
+    val columnList = concept.getAttributes(context)
+      .filter(curAttr => !curAttr.annotations.contains(Annotation.PRIVATE))
+      .map(curAttr => new SqlIdentifier(List(curAttr.name).asJava, SqlParserPos.ZERO))
     val columnListNode = new SqlNodeList(columnList.asJava, SqlParserPos.ZERO)
     val insertStmt = new SqlInsert(SqlParserPos.ZERO, SqlNodeList.EMPTY, tableId, source, columnListNode)
     composer.sqlConverter.expressionConverter.toSql(insertStmt) + ";"
@@ -194,7 +198,9 @@ class ConceptSqlMaterializer(context: ValidationContext, config: FrameworkConfig
       SqlStdOperatorTable.AS.createCall(SqlParserPos.ZERO, targetTable, targetAlias)
     )
 
-    val attributeNames = concept.getAttributes(context).map(_.name)
+    val attributeNames = concept.getAttributes(context)
+      .filter(curAttr => !curAttr.annotations.contains(Annotation.PRIVATE))
+      .map(_.name)
 
     val source = composer.composeToSqlNode(concept)
     val sourceAlias = new SqlIdentifier(List("sens_merge_source").asJava, SqlParserPos.ZERO)
@@ -255,8 +261,8 @@ class ConceptSqlMaterializer(context: ValidationContext, config: FrameworkConfig
       Equals(ConceptAttribute("sens_merge_source" :: Nil, uniqueKey), ConceptAttribute("sens_merge_target" :: Nil, uniqueKey))
     )
 
-    val attributeNames = concept
-      .getAttributes(context)
+    val attributeNames = concept.getAttributes(context)
+      .filter(curAttr => !curAttr.annotations.contains(Annotation.PRIVATE))
       .map(_.name)
 
     val targetColumnList = attributeNames

@@ -6,6 +6,7 @@ import org.sens.core.expression.{ConceptAttribute, GenericParameter, SensExpress
 import org.sens.core.expression.operation.comparison.Equals
 import org.sens.parser.{AttributeExpressionNotFound, GenericDefinitionException, ValidationContext}
 
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Success, Try}
 
@@ -128,7 +129,7 @@ case class Concept(name: String,
     Try(Concept(
       name,
       genericParameters,
-      inferredAttributesExpressions.map(_.get),
+      removeLinksToChildAttributes(inferredAttributesExpressions.map(_.get)),
       inferredParentConceptsExpressions.map(_.get),
       inferredAttributeDependencies,
       groupByAttributes,
@@ -138,6 +139,26 @@ case class Concept(name: String,
       offset,
       annotations
     ))
+  }
+
+  def removeLinksToChildAttributes(attributesList: List[Attribute]): List[Attribute] = {
+    val attrsMap = mutable.Map[String, Option[SensExpression]]()
+    attributesList.foreach(curAttr => {
+      attrsMap += ((curAttr.name, curAttr.value))
+    })
+    attributesList.foreach(curAttr => {
+      attrsMap.foreach(attrToUpdate => {
+        if(attrToUpdate._1 != curAttr.name && attrToUpdate._2.isDefined && curAttr.value.isDefined) {
+          val curAttrLink = ConceptAttribute(Nil, curAttr.name)
+          val newAttrValue = attrsMap(curAttr.name).get
+          val updatedAttrValue = attrToUpdate._2.map(_.replaceSubExpression(curAttrLink, newAttrValue))
+          attrsMap += ((attrToUpdate._1, updatedAttrValue))
+        }
+      })
+    })
+    attributesList.map(curAttr =>
+      Attribute(curAttr.name, attrsMap(curAttr.name), curAttr.annotations)
+    )
   }
 
   override def toSensString: String =

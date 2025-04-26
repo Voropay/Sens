@@ -12,7 +12,7 @@ import org.sens.core.expression.{ConceptAttribute, FunctionCall}
 import org.sens.core.expression.concept.{AnonymousConceptDefinition, ConceptReference}
 import org.sens.core.expression.function.{AnonymousFunctionDefinition, FunctionReference}
 import org.sens.core.expression.literal.{BooleanLiteral, IntLiteral, StringLiteral}
-import org.sens.core.expression.operation.arithmetic.Add
+import org.sens.core.expression.operation.arithmetic.{Add, Multiply}
 import org.sens.core.expression.operation.comparison.{Equals, GreaterThan}
 import org.sens.core.expression.operation.logical.And
 import org.sens.core.statement.{ConceptDefinition, NOP}
@@ -665,6 +665,34 @@ class ConceptToRelConverterTests extends AnyFlatSpec with Matchers {
         "ORDER BY `attr2` + `attr3`, `attr1` DESC\n" +
         "OFFSET 20 ROWS\n" +
         "FETCH NEXT 10 ROWS ONLY"
+    )
+  }
+
+  "Concept definition with ephemeral attributes" should "be converted to relational algebra correctly" in {
+    val context = ValidationContext()
+    context.addConcept(ConceptDefinition(DataSourceConcept(
+      "conceptB",
+      Attribute("attr1", None, Nil) ::
+        Attribute("attr2", None, Nil) ::
+        Attribute("attr3", None, Nil) ::
+        Attribute("attr4", None, Nil) :: Nil,
+      FileDataSource("someFile", FileFormats.CSV),
+      Nil
+    )))
+
+    val conDef = Concept.builder("conceptA",
+      Attribute("id", Some(ConceptAttribute("cb" :: Nil, "attr1")), Nil) ::
+        Attribute("amount", Some(ConceptAttribute("cb" :: Nil, "attr2")), Annotation.PRIVATE :: Nil) ::
+        Attribute("price", Some(ConceptAttribute("cb" :: Nil, "attr3")), Annotation.PRIVATE :: Nil) ::
+        Attribute("value", Some(Multiply(ConceptAttribute(Nil, "amount"), ConceptAttribute(Nil, "price"))), Nil) :: Nil,
+      ParentConcept(ConceptReference("conceptB"), Some("cb"), Map(), Nil) :: Nil)
+      .build
+
+    val conceptConverter = ConceptToRelConverter.create(context)
+    val conceptRel = conceptConverter.toRel(conDef)
+    toSql(conceptRel) should equal(
+      "SELECT `attr1` AS `id`, `attr2` * `attr3` AS `value`\n" +
+        "FROM `vs`.`conceptB`"
     )
   }
 

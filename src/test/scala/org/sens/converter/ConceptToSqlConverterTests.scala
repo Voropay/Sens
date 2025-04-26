@@ -808,6 +808,34 @@ class ConceptToSqlConverterTests extends AnyFlatSpec with Matchers {
     )
   }
 
+  "Concept definition with ephemeral attributes" should "be converted to SQL correctly" in {
+    val context = ValidationContext()
+    context.addConcept(ConceptDefinition(DataSourceConcept(
+      "conceptB",
+      Attribute("attr1", None, Nil) ::
+        Attribute("attr2", None, Nil) ::
+        Attribute("attr3", None, Nil) ::
+        Attribute("attr4", None, Nil) :: Nil,
+      FileDataSource("someFile", FileFormats.CSV),
+      Nil
+    )))
+
+    val conDef1 = Concept.builder("conceptA",
+      Attribute("id", Some(ConceptAttribute("cb" :: Nil, "attr1")), Nil) ::
+        Attribute("amount", Some(ConceptAttribute("cb" :: Nil, "attr2")), Annotation.PRIVATE :: Nil) ::
+        Attribute("price", Some(ConceptAttribute("cb" :: Nil, "attr3")), Annotation.PRIVATE :: Nil) ::
+        Attribute("value", Some(Multiply(ConceptAttribute(Nil, "amount"), ConceptAttribute(Nil, "price"))), Nil) :: Nil,
+      ParentConcept(ConceptReference("conceptB"), Some("cb"), Map(), Nil) :: Nil)
+      .build
+
+    val converter = ConceptToSqlConverter.create(context)
+    val conceptSql1 = converter.toSql(conDef1)
+    conceptSql1 should equal(
+      "SELECT `cb`.`attr1` AS `id`, `cb`.`attr2` * `cb`.`attr3` AS `value`\n" +
+        "FROM `someFile` AS `cb`"
+    )
+  }
+
   "Concept definition with function concept call" should "be converted to SQL correctly" in {
     val context = ValidationContext()
     context.addConcept(ConceptDefinition(FunctionConcept(

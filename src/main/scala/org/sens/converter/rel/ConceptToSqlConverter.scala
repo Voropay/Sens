@@ -168,7 +168,11 @@ class ConceptToSqlConverter (context: ValidationContext, config: FrameworkConfig
   }
 
   def attributesToSqlNodeList(attributes: List[Attribute]): SqlNodeList = {
-    new SqlNodeList(attributes.map(attributeToSqlNode).asJava, SqlParserPos.ZERO)
+    new SqlNodeList(attributes.filter(curAttr =>
+        !curAttr.annotations.contains(Annotation.PRIVATE)
+      ).map(attributeToSqlNode)
+      .asJava,
+      SqlParserPos.ZERO)
   }
 
   def attributeToSqlNode(attribute: Attribute): SqlNode = {

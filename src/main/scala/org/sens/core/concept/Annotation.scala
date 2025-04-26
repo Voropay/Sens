@@ -75,4 +75,6 @@ object Annotation {
   def MATERIALIZED_INCREMENTAL(uniqueKey: List[String]) = Annotation(
     MATERIALIZED,
     Map(TYPE -> StringLiteral(INCREMENTAL_TYPE), "uniqueKey" -> ListLiteral(uniqueKey.map(StringLiteral))))
+
+  val PRIVATE = Annotation("Private", Map())
 }

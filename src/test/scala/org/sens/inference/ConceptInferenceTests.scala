@@ -10,10 +10,11 @@ import org.sens.core.expression.function.AnonymousFunctionDefinition
 import org.sens.core.expression.literal.{IntLiteral, StringLiteral}
 import org.sens.core.expression.operation.comparison.{Equals, GreaterThan}
 import org.sens.core.expression.operation.logical.And
+import org.sens.core.expression.operation.arithmetic.{Add, Multiply}
 import org.sens.core.statement.{ConceptDefinition, NOP}
-import org.sens.parser.{AttributeExpressionNotFound, ValidationContext}
+import org.sens.parser.ValidationContext
 
-import scala.util.{Failure, Success}
+import scala.util.Success
 
 class ConceptInferenceTests extends AnyFlatSpec with Matchers {
 
@@ -282,23 +283,27 @@ class ConceptInferenceTests extends AnyFlatSpec with Matchers {
 
       val conDef1 = Concept.builder(
         "conceptA",
-        Attribute("attrA", None, Nil) ::
-          Attribute("attrB", None, Nil) ::
-          Attribute("attrC", None, Nil) :: Nil,
+        Attribute("attr1", None, Nil) ::
+          Attribute("attrB", Some(Add(ConceptAttribute(Nil, "attr1"), IntLiteral(1))), Nil) ::
+          Attribute("attrC", Some(Multiply(ConceptAttribute(Nil, "attrB"), IntLiteral(2))), Nil) :: Nil,
         ParentConcept(ConceptReference("conceptB"), Some("cb"), Map(), Nil) :: Nil)
-        .attributeDependencies(
-          And(
-            Equals(ConceptAttribute("cb" :: Nil, "attr3"), StringLiteral("SomeValue")),
-            And(
-              Equals(ConceptAttribute(Nil, "attrA"), ConceptAttribute("cb" :: Nil, "attr1")),
-              Equals(ConceptAttribute(Nil, "attrB"), ConceptAttribute("cb" :: Nil, "attr2"))
-            )))
-        .orderByAttributes(Order(ConceptAttribute(Nil, "attr1"), Order.ASC) :: Nil)
-        .build
+        .build()
 
       val inferredConcept1 = conDef1.inferAttributeExpressions(context)
-      inferredConcept1 should equal(Failure(AttributeExpressionNotFound("attrC")))
+      inferredConcept1 should equal(Success(
+        Concept.builder(
+          "conceptA",
+          Attribute("attr1", Some(ConceptAttribute("cb" :: Nil, "attr1")), Nil) ::
+            Attribute("attrB", Some(Add(ConceptAttribute("cb" :: Nil, "attr1"), IntLiteral(1))), Nil) ::
+            Attribute("attrC", Some(Multiply(Add(ConceptAttribute("cb" :: Nil, "attr1"), IntLiteral(1)), IntLiteral(2))), Nil) :: Nil,
+          ParentConcept(ConceptReference("conceptB"), Some("cb"), Map(), Nil) :: Nil)
+          .build()
+      ))
     }
+
+  "Attribute inference of concept definition" should "remove links to child attributes" in {
+
+  }
 
   "Nested Anonymous Concept definition" should "infer attributes expressions correctly" in {
     val context = ValidationContext()
