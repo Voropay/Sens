@@ -514,11 +514,11 @@ class ExpressionToRelConverterTests extends AnyFlatSpec with Matchers {
           Nil) ::
         Attribute("val2", Some(FunctionCall(
           FunctionReference("cast"),
-          ConceptAttribute("cb" :: Nil, "attr3") :: BasicTypeLiteral(SensBasicTypes.INT_TYPE) :: Nil)),
+          ConceptAttribute("cb" :: Nil, "attr3") :: IntTypeLiteral() :: Nil)),
           Nil) ::
         Attribute("val3", Some(FunctionCall(
           FunctionReference("cast"),
-          ConceptAttribute("cb" :: Nil, "attr4") :: BasicTypeLiteral(SensBasicTypes.STRING_TYPE)  :: IntLiteral(8) :: Nil)),
+          ConceptAttribute("cb" :: Nil, "attr4") :: StringTypeLiteral(8) :: Nil)),
           Nil) ::
         Attribute("val4", Some(FunctionCall(
           FunctionReference("current_time"),
@@ -547,7 +547,7 @@ class ExpressionToRelConverterTests extends AnyFlatSpec with Matchers {
       "SELECT `attr1` AS `id`, " +
         "COALESCE(`attr2`, `attr3`, `attr4`, 'N/A') AS `val1`, " +
         "CAST(`attr3` AS INTEGER) AS `val2`, " +
-        "CAST(`attr4` AS VARCHAR CHARACTER SET `ISO-8859-1`) AS `val3`, " +
+        "CAST(`attr4` AS VARCHAR(8) CHARACTER SET `ISO-8859-1`) AS `val3`, " +
         "CURRENT_TIME AS `val4`, " +
         "CURRENT_DATE AS `val5`, " +
         "CURRENT_TIMESTAMP AS `val6`, " +

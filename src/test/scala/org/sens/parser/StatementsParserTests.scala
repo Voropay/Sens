@@ -102,19 +102,19 @@ class StatementsParserTests extends AnyFlatSpec with Matchers {
       For(None, None, None, ProcedureCall(expression.FunctionCall(FunctionReference("doSomething"), Nil)))
     )
 
-    statementsParser("for(item in list) println(item)").get should equal (
+    statementsParser("for(item in someList) println(item)").get should equal (
       ForEachItemInList(
         "item",
-        NamedElementPlaceholder("list"),
+        NamedElementPlaceholder("someList"),
         ProcedureCall(expression.FunctionCall(FunctionReference("println"), NamedElementPlaceholder("item") :: Nil))
       )
     )
 
-    statementsParser("for(key, value in map) println(key + \": \" + value)").get should equal (
+    statementsParser("for(key, value in someMap) println(key + \": \" + value)").get should equal (
       ForEachItemInMap(
         "key",
         "value",
-        NamedElementPlaceholder("map"),
+        NamedElementPlaceholder("someMap"),
         ProcedureCall(expression.FunctionCall(
           FunctionReference("println"),
           Add(NamedElementPlaceholder("key"), Add(StringLiteral(": "), NamedElementPlaceholder("value"))) :: Nil

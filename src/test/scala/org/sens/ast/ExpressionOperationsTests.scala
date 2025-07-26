@@ -11,7 +11,7 @@ import org.sens.core.expression.operation.relational._
 import org.sens.core.expression.{CollectionItem, ConceptAttribute, ListInitialization, Variable, _}
 import org.sens.core.expression.function._
 import org.sens.parser.WrongTypeException
-import org.sens.core.statement.{Return, StandardSensStatements}
+import org.sens.core.statement.Return
 import org.sens.core.concept.{Annotation, Attribute, Order, ParentConcept}
 
 class ExpressionOperationsTests extends AnyFlatSpec with Matchers {
@@ -62,15 +62,6 @@ class ExpressionOperationsTests extends AnyFlatSpec with Matchers {
     n.replaceSubExpression(NullLiteral(), FloatLiteral(0)) should equal(FloatLiteral(0))
     n.replaceSubExpression(BooleanLiteral(false), FloatLiteral(0)) should equal(n)
 
-    val t = BasicTypeLiteral(SensBasicTypes.INT_TYPE)
-    t.getSubExpressions should equal(Nil)
-    t.findSubExpression(_ == BasicTypeLiteral(SensBasicTypes.INT_TYPE)) should equal(Some(t))
-    t.findSubExpression(_ == BasicTypeLiteral(SensBasicTypes.FLOAT_TYPE)) should equal(None)
-    t.findAllSubExpressions(_ == BasicTypeLiteral(SensBasicTypes.INT_TYPE)) should equal(List(t))
-    t.findAllSubExpressions(_ == BasicTypeLiteral(SensBasicTypes.FLOAT_TYPE)) should equal(Nil)
-    t.replaceSubExpression(BasicTypeLiteral(SensBasicTypes.INT_TYPE), FloatLiteral(0)) should equal(FloatLiteral(0))
-    t.replaceSubExpression(BasicTypeLiteral(SensBasicTypes.FLOAT_TYPE), FloatLiteral(0)) should equal(t)
-
     val l = ListLiteral(BooleanLiteral(true) :: IntLiteral(1) :: FloatLiteral(1) :: Nil)
     l.getSubExpressions should equal(BooleanLiteral(true) :: IntLiteral(1) :: FloatLiteral(1) :: Nil)
     l.findSubExpression(_ == NullLiteral()) should equal(None)
@@ -109,6 +100,68 @@ class ExpressionOperationsTests extends AnyFlatSpec with Matchers {
     assertThrows[WrongTypeException] {
       m.replaceSubExpression(StringLiteral("1"), Variable("a"))
     }
+  }
+
+  "Type Literals" should "work with subexpressions correctly" in {
+    val it = IntTypeLiteral()
+    it.getSubExpressions should equal(Nil)
+    it.findSubExpression(_ == IntTypeLiteral()) should equal(Some(it))
+    it.findSubExpression(_ == FloatTypeLiteral()) should equal(None)
+    it.findAllSubExpressions(_ == IntTypeLiteral()) should equal(List(it))
+    it.findAllSubExpressions(_ == FloatTypeLiteral()) should equal(Nil)
+    it.replaceSubExpression(IntTypeLiteral(), FloatTypeLiteral()) should equal(FloatTypeLiteral())
+    it.replaceSubExpression(FloatTypeLiteral(), BooleanTypeLiteral()) should equal(it)
+
+    val ft = FloatTypeLiteral()
+    ft.getSubExpressions should equal(Nil)
+    ft.findSubExpression(_ == FloatTypeLiteral()) should equal(Some(ft))
+    ft.findSubExpression(_ == IntTypeLiteral()) should equal(None)
+    ft.findAllSubExpressions(_ == FloatTypeLiteral()) should equal(List(ft))
+    ft.findAllSubExpressions(_ == IntTypeLiteral()) should equal(Nil)
+    ft.replaceSubExpression(FloatTypeLiteral(), IntTypeLiteral()) should equal(IntTypeLiteral())
+    ft.replaceSubExpression(IntTypeLiteral(), FloatTypeLiteral()) should equal(ft)
+
+    val bt = BooleanTypeLiteral()
+    bt.getSubExpressions should equal(Nil)
+    bt.findSubExpression(_ == BooleanTypeLiteral()) should equal(Some(bt))
+    bt.findSubExpression(_ == IntTypeLiteral()) should equal(None)
+    bt.findAllSubExpressions(_ == BooleanTypeLiteral()) should equal(List(bt))
+    bt.findAllSubExpressions(_ == IntTypeLiteral()) should equal(Nil)
+    bt.replaceSubExpression(BooleanTypeLiteral(), IntTypeLiteral()) should equal(IntTypeLiteral())
+    bt.replaceSubExpression(IntTypeLiteral(), FloatTypeLiteral()) should equal(bt)
+
+    val st = StringTypeLiteral(255)
+    st.getSubExpressions should equal(Nil)
+    st.findSubExpression(_ == StringTypeLiteral(255)) should equal(Some(st))
+    st.findSubExpression(_ == IntTypeLiteral()) should equal(None)
+    st.findAllSubExpressions(_ == StringTypeLiteral(255)) should equal(List(st))
+    st.findAllSubExpressions(_ == IntTypeLiteral()) should equal(Nil)
+    st.replaceSubExpression(StringTypeLiteral(255), StringTypeLiteral(64)) should equal(StringTypeLiteral(64))
+    st.replaceSubExpression(IntTypeLiteral(), BooleanTypeLiteral()) should equal(st)
+
+    val lt = ListTypeLiteral(StringTypeLiteral(255))
+    lt.getSubExpressions should equal (StringTypeLiteral(255) :: Nil)
+    lt.findSubExpression(_ == ListTypeLiteral(StringTypeLiteral(255))) should equal(Some(lt))
+    lt.findSubExpression(_ == StringTypeLiteral(255)) should equal(Some(StringTypeLiteral(255)))
+    lt.findSubExpression(_ == IntTypeLiteral()) should equal(None)
+    lt.findAllSubExpressions(_ == ListTypeLiteral(StringTypeLiteral(255))) should equal(List(lt))
+    lt.findAllSubExpressions(_ == StringTypeLiteral(255)) should equal(List(StringTypeLiteral(255)))
+    lt.findAllSubExpressions(_ == IntTypeLiteral()) should equal(Nil)
+    lt.replaceSubExpression(StringTypeLiteral(255), FloatTypeLiteral()) should equal(ListTypeLiteral(FloatTypeLiteral()))
+    lt.replaceSubExpression(ListTypeLiteral(StringTypeLiteral(255)), FloatTypeLiteral()) should equal(FloatTypeLiteral())
+    lt.replaceSubExpression(IntTypeLiteral(), FloatTypeLiteral()) should equal(lt)
+
+    val mt = MapTypeLiteral(Map("attr1" -> StringTypeLiteral(255), "attr2" -> IntTypeLiteral()))
+    mt.getSubExpressions should equal(StringTypeLiteral(255) :: IntTypeLiteral() :: Nil)
+    mt.findSubExpression(_ == MapTypeLiteral(Map("attr1" -> StringTypeLiteral(255), "attr2" -> IntTypeLiteral()))) should equal(Some(mt))
+    mt.findSubExpression(_ == StringTypeLiteral(255)) should equal(Some(StringTypeLiteral(255)))
+    mt.findSubExpression(_ == FloatTypeLiteral()) should equal(None)
+    mt.findAllSubExpressions(_ == MapTypeLiteral(Map("attr1" -> StringTypeLiteral(255), "attr2" -> IntTypeLiteral()))) should equal(List(mt))
+    mt.findAllSubExpressions(_ == StringTypeLiteral(255)) should equal(List(StringTypeLiteral(255)))
+    mt.findAllSubExpressions(_ == FloatTypeLiteral()) should equal(Nil)
+    mt.replaceSubExpression(StringTypeLiteral(255), FloatTypeLiteral()) should equal(MapTypeLiteral(Map("attr1" -> FloatTypeLiteral(), "attr2" -> IntTypeLiteral())))
+    mt.replaceSubExpression(MapTypeLiteral(Map("attr1" -> StringTypeLiteral(255), "attr2" -> IntTypeLiteral())), FloatTypeLiteral()) should equal(FloatTypeLiteral())
+    mt.replaceSubExpression(FloatTypeLiteral(), IntTypeLiteral()) should equal(mt)
   }
 
   "Arithmetic operations" should "work with subexpressions correctly" in {

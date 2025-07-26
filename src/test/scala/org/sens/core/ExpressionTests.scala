@@ -32,10 +32,15 @@ class ExpressionTests extends AnyFlatSpec with Matchers {
 
     NullLiteral().toSensString should equal ("Null")
 
-    BasicTypeLiteral(SensBasicTypes.INT_TYPE).toSensString should equal ("int")
-    BasicTypeLiteral(SensBasicTypes.FLOAT_TYPE).toSensString should equal ("float")
-    BasicTypeLiteral(SensBasicTypes.STRING_TYPE).toSensString should equal ("string")
-    BasicTypeLiteral(SensBasicTypes.BOOLEAN_TYPE).toSensString should equal ("boolean")
+    IntTypeLiteral().toSensString should equal ("int")
+    FloatTypeLiteral().toSensString should equal ("float")
+    StringTypeLiteral(255).toSensString should equal ("string(255)")
+    BooleanTypeLiteral().toSensString should equal ("boolean")
+    ListTypeLiteral(IntTypeLiteral()).toSensString should equal ("list<int>")
+    MapTypeLiteral(Map("attr1" -> IntTypeLiteral(), "attr2" -> BooleanTypeLiteral())).toSensString should equal ("map<int attr1,\nboolean attr2>")
+    MapTypeLiteral(
+      Map("attr1" -> ListTypeLiteral(IntTypeLiteral()), "attr2" -> BooleanTypeLiteral())
+    ).toSensString should equal ("map<list<int> attr1,\nboolean attr2>")
 
     ListLiteral(IntLiteral(1) :: StringLiteral("plus") :: FloatLiteral(1.2) :: Nil).toSensString should equal ("[1, \"plus\", 1.2]")
 

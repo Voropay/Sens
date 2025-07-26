@@ -5,7 +5,7 @@ import org.apache.calcite.rel.RelNode
 import org.apache.calcite.rel.`type`.RelDataTypeSystem
 import org.apache.calcite.rex.{RexNode, RexWindowBounds}
 import org.apache.calcite.sql.{SqlBinaryOperator, SqlIntervalQualifier}
-import org.apache.calcite.sql.`type`.SqlTypeFactoryImpl
+import org.apache.calcite.sql.`type`.{SqlTypeFactoryImpl, SqlTypeName}
 import org.apache.calcite.sql.fun.SqlStdOperatorTable
 import org.apache.calcite.sql.parser.SqlParserPos
 import org.apache.calcite.tools.{FrameworkConfig, RelBuilder}
@@ -41,11 +41,15 @@ class ExpressionsToRelConverter(config: FrameworkConfig, context: ValidationCont
           val sqlOperator = sqlOperatorMap(reference.name)
           if(sqlOperator == SqlStdOperatorTable.CAST) {
             val arg = sensExpressionToRexNode(arguments.head, childAttributes, relBuilder, numberOfTables)
-            val sqlType = arguments.tail.head match {
-              case BasicTypeLiteral(typeName) => ExpressionsToSqlConverter.getTypeByName(typeName)
-              case other => throw WrongArgumentsTypeException("cast", BasicTypeLiteral.getClass.getName, other.getClass.getName)
+            arguments.tail.head match {
+              case BooleanTypeLiteral() =>  relBuilder.cast(arg, SqlTypeName.BOOLEAN)
+              case FloatTypeLiteral() =>  relBuilder.cast(arg, SqlTypeName.FLOAT)
+              case IntTypeLiteral() =>  relBuilder.cast(arg, SqlTypeName.INTEGER)
+              case StringTypeLiteral(length) =>  relBuilder.cast(arg, SqlTypeName.VARCHAR, length)
+              case ListTypeLiteral(_) => throw new NotImplementedException
+              case MapTypeLiteral(_) => throw new NotImplementedException
+              case other => throw WrongArgumentsTypeException("cast", "SensTypeLiteral", other.getClass.getName)
             }
-            relBuilder.cast(arg, sqlType)
           } else {
             relBuilder.call(sqlOperator, arguments.map(sensExpressionToRexNode(_, childAttributes, relBuilder, numberOfTables)).asJava)
           }

@@ -7,13 +7,12 @@ import org.sens.core.datasource.{FileDataSource, FileFormats}
 import org.sens.core.expression.concept.{AnonymousConceptDefinition, AnonymousFunctionConceptDefinition, ConceptReference, GenericConceptReference}
 import org.sens.core.expression.function.{AnonymousFunctionDefinition, FunctionReference}
 import org.sens.core.expression._
-import org.sens.core.expression.literal.{BasicTypeLiteral, _}
+import org.sens.core.expression.literal._
 import org.sens.core.expression.operation.comparison.{Equals, GreaterThan}
 import org.sens.core.expression.operation.logical.And
 import org.sens.core.statement.{ConceptDefinition, FunctionDefinition, NOP, Return, VariableDefinition}
 import org.sens.parser.{ElementNotFoundException, ValidationContext, WrongFunctionArgumentsException}
 
-import scala.collection.immutable.Nil
 import scala.util.{Failure, Success}
 
 class ExpressionValidationTests extends AnyFlatSpec with Matchers {
@@ -34,7 +33,7 @@ class ExpressionValidationTests extends AnyFlatSpec with Matchers {
     ll.validateAndRemoveVariablePlaceholders(context) should equal(Success(ll))
     val ml = MapLiteral(Map(StringLiteral("key1") -> StringLiteral("strValue"), StringLiteral("key2") -> BooleanLiteral(true)))
     ml.validateAndRemoveVariablePlaceholders(context) should equal(Success(ml))
-    val tl = BasicTypeLiteral(SensBasicTypes.INT_TYPE)
+    val tl = IntTypeLiteral()
     tl.validateAndRemoveVariablePlaceholders(context) should equal(Success(tl))
   }
 

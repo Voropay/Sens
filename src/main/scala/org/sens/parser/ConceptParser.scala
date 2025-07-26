@@ -34,8 +34,9 @@ trait ConceptParser extends StatementsParser {
 
   def sensAttributeParser: Parser[SensAttribute] = conceptAttributesReference | attributeParser
 
-  def attributeParser: Parser[Attribute] = repsep(annotationParser, ",") ~ sensIdent ~ opt("=" ~> sensExpression) ^^ {value =>
-    Attribute(value._1._2, value._2, value._1._1)
+  def attributeParser: Parser[Attribute] = repsep(annotationParser, ",") ~ opt(sensTypeLiteral) ~ sensIdent ~ opt("=" ~> sensExpression) ^^ {
+    case annotations ~ typeLiteral ~ name ~ expression =>
+      Attribute(name, expression, annotations, typeLiteral)
   }
 
   def parentConceptParser: Parser[ParentConcept] =

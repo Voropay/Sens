@@ -4,14 +4,14 @@ import org.apache.calcite.sql.`type`.{OperandTypes, ReturnTypes, SqlTypeName}
 import org.apache.calcite.sql.dialect.AnsiSqlDialect
 import org.apache.calcite.sql.fun.{SqlCase, SqlStdOperatorTable}
 import org.apache.calcite.sql.parser.SqlParserPos
-import org.apache.calcite.sql.{SqlBasicCall, SqlBasicTypeNameSpec, SqlCall, SqlDataTypeSpec, SqlFunction, SqlFunctionCategory, SqlIdentifier, SqlIntervalQualifier, SqlKind, SqlLiteral, SqlNode, SqlNodeList, SqlNumericLiteral, SqlSelectKeyword, SqlWindow}
-import org.apache.calcite.tools.{FrameworkConfig, RelBuilder}
+import org.apache.calcite.sql.{SqlBasicCall, SqlBasicTypeNameSpec, SqlCall, SqlCollectionTypeNameSpec, SqlDataTypeSpec, SqlFunction, SqlFunctionCategory, SqlIdentifier, SqlIntervalQualifier, SqlKind, SqlLiteral, SqlNode, SqlNodeList, SqlNumericLiteral, SqlRowTypeNameSpec, SqlSelectKeyword, SqlTypeNameSpec, SqlWindow}
+import org.apache.calcite.tools.FrameworkConfig
 import org.apache.commons.lang.NotImplementedException
+import org.sens.converter.rel.ExpressionsToSqlConverter.sensExpressionToSqlTypeNameSpec
 import org.sens.core.concept.Order
 import org.sens.core.expression.concept.AnonymousConceptDefinition
 import org.sens.core.expression.{CollectionItem, ConceptAttribute, ConceptObject, FunctionCall, If, ListInitialization, MapInitialization, SensExpression, Switch, WindowFunction, WindowFunctions}
 import org.sens.core.expression.function.FunctionReference
-import org.sens.core.expression.literal.SensBasicTypes.SensBasicType
 import org.sens.core.expression.literal._
 import org.sens.core.expression.operation.arithmetic._
 import org.sens.core.expression.operation.logical._
@@ -156,9 +156,10 @@ class ExpressionsToSqlConverter(context: ValidationContext, config: FrameworkCon
       case StringLiteral(value) => SqlLiteral.createCharString(value, SqlParserPos.ZERO)
       case BooleanLiteral(value) => SqlLiteral.createBoolean(value, SqlParserPos.ZERO)
       case NullLiteral() => SqlLiteral.createNull(SqlParserPos.ZERO)
-      case BasicTypeLiteral(basicType) =>
-        val typeName: SqlTypeName = ExpressionsToSqlConverter.getTypeByName(basicType)
-        new SqlDataTypeSpec(new SqlBasicTypeNameSpec(typeName, SqlParserPos.ZERO), SqlParserPos.ZERO)
+      case tl: SensTypeLiteral =>
+        new SqlDataTypeSpec(
+          sensExpressionToSqlTypeNameSpec(tl),
+          SqlParserPos.ZERO)
       case ListLiteral(items) =>
         new SqlBasicCall(
           SqlStdOperatorTable.ARRAY_VALUE_CONSTRUCTOR,
@@ -484,12 +485,20 @@ object ExpressionsToSqlConverter {
     new ExpressionsToSqlConverter(context, config, conceptConverter)
   }
 
-  def getTypeByName(basicType: SensBasicType): SqlTypeName = {
-    basicType match {
-      case SensBasicTypes.BOOLEAN_TYPE => SqlTypeName.BOOLEAN
-      case SensBasicTypes.FLOAT_TYPE => SqlTypeName.FLOAT
-      case SensBasicTypes.INT_TYPE => SqlTypeName.INTEGER
-      case SensBasicTypes.STRING_TYPE => SqlTypeName.VARCHAR
+  def sensExpressionToSqlTypeNameSpec(typeLiteral: SensTypeLiteral): SqlTypeNameSpec = {
+    typeLiteral match {
+      case IntTypeLiteral() => new SqlBasicTypeNameSpec(SqlTypeName.INTEGER, SqlParserPos.ZERO)
+      case FloatTypeLiteral() => new SqlBasicTypeNameSpec(SqlTypeName.FLOAT, SqlParserPos.ZERO)
+      case BooleanTypeLiteral() => new SqlBasicTypeNameSpec(SqlTypeName.BOOLEAN, SqlParserPos.ZERO)
+      case StringTypeLiteral(length) => new SqlBasicTypeNameSpec(SqlTypeName.VARCHAR, length, -1, SqlParserPos.ZERO)
+      case ListTypeLiteral(elementType) =>
+        val nestedType = sensExpressionToSqlTypeNameSpec(elementType)
+        new SqlCollectionTypeNameSpec(nestedType, SqlTypeName.ARRAY, SqlParserPos.ZERO)
+      case MapTypeLiteral(elements) =>
+        new SqlRowTypeNameSpec(
+          SqlParserPos.ZERO,
+          elements.keys.map(rowName => new SqlIdentifier(rowName, SqlParserPos.ZERO)).toList.asJava,
+          elements.values.map(rowType => new SqlDataTypeSpec(sensExpressionToSqlTypeNameSpec(rowType), SqlParserPos.ZERO)).toList.asJava)
     }
   }
 }

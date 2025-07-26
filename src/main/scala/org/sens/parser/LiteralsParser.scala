@@ -17,11 +17,21 @@ trait LiteralsParser extends JavaTokenParsers {
       IntLiteral(floatingValue.toInt)
     }
   }}
-  def sensTypeLiteral: Parser[BasicTypeLiteral] = intTypeLiteral | floatTypeLiteral | stringTypeLiteral | booleanTypeLiteral
-  def intTypeLiteral: Parser[BasicTypeLiteral] = intKeyword ^^ {_ => BasicTypeLiteral(SensBasicTypes.INT_TYPE)}
-  def floatTypeLiteral: Parser[BasicTypeLiteral] = floatKeyword ^^ {_ => BasicTypeLiteral(SensBasicTypes.FLOAT_TYPE)}
-  def stringTypeLiteral: Parser[BasicTypeLiteral] = stringKeyword ^^ {_ => BasicTypeLiteral(SensBasicTypes.STRING_TYPE)}
-  def booleanTypeLiteral: Parser[BasicTypeLiteral] = booleanKeyword ^^ {_ => BasicTypeLiteral(SensBasicTypes.BOOLEAN_TYPE)}
+  def sensTypeLiteral: Parser[SensTypeLiteral] = intTypeLiteral | floatTypeLiteral | stringTypeLiteral | booleanTypeLiteral |
+    listTypeLiteral | mapTypeLiteral
+  def intTypeLiteral: Parser[SensTypeLiteral] = intKeyword ^^ {_ => IntTypeLiteral()}
+  def floatTypeLiteral: Parser[SensTypeLiteral] = floatKeyword ^^ {_ => FloatTypeLiteral()}
+  def stringTypeLiteral: Parser[SensTypeLiteral] = stringKeyword ~ "(" ~ wholeNumber ~ ")" ^^ {
+    case "string" ~ "(" ~ length ~ ")" => StringTypeLiteral(length.toInt)
+  }
+  def booleanTypeLiteral: Parser[SensTypeLiteral] = booleanKeyword ^^ {_ => BooleanTypeLiteral()}
+  def listTypeLiteral: Parser[SensTypeLiteral] = listKeyword ~ "<" ~ sensTypeLiteral ~ ">" ^^ {
+    case "list" ~ "<" ~ listTypeValue ~ ">" => ListTypeLiteral(listTypeValue)
+  }
+  def mapTypeLiteral: Parser[SensTypeLiteral] = mapKeyword ~ "<" ~ repsep(nameTypePair, ",") ~ ">" ^^ {
+    case "map" ~ "<" ~ mapTypeValues ~ ">" =>MapTypeLiteral(mapTypeValues.toMap)
+  }
+  def nameTypePair = (sensTypeLiteral ~ ident) ^^ {case typeName ~ fieldName => (fieldName, typeName)}
 
   def sensStringLiteral: Parser[StringLiteral] = stringLiteral ^^ {value => StringLiteral(removeQuotes(value))}
   def sensNullLiteral: Parser[NullLiteral] = nullKeyword ^^ {_ => NullLiteral()}
@@ -41,7 +51,7 @@ trait LiteralsParser extends JavaTokenParsers {
     unionKeyword | intersectKeyword | minusKeyword |
     whereKeyword | withKeyword | withoutKeyword | orderByKeyword |
     groupByKeyword | havingKeyword | limitKeyword | offsetKeyword |
-    intKeyword | floatKeyword | booleanKeyword | stringKeyword
+    intKeyword | floatKeyword | booleanKeyword | stringKeyword | listKeyword | mapKeyword
 
   def trueKeyword: Parser[String] = "true\\b".r
   def falseKeyword: Parser[String] = "false\\b".r
@@ -104,5 +114,8 @@ trait LiteralsParser extends JavaTokenParsers {
   def floatKeyword: Parser[String] = "float\\b".r
   def stringKeyword: Parser[String] = "string\\b".r
   def booleanKeyword: Parser[String] = "boolean\\b".r
+  def listKeyword: Parser[String] = "list\\b".r
+  def mapKeyword: Parser[String] = "map\\b".r
+
 
 }

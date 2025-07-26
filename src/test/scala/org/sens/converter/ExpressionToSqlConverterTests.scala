@@ -33,10 +33,19 @@ class ExpressionToSqlConverterTests extends AnyFlatSpec with Matchers {
     ) should equal ("MAP[1, 'one', 2, 'two']")
     expressionsConverter.sensExpressionToSql(TimeIntervalLiteral(1, TimeIntervalLiteral.MONTH)) should equal ("INTERVAL '1' MONTH(0)")
 
-    expressionsConverter.sensExpressionToSql(BasicTypeLiteral(SensBasicTypes.INT_TYPE)) should equal ("INTEGER")
-    expressionsConverter.sensExpressionToSql(BasicTypeLiteral(SensBasicTypes.FLOAT_TYPE)) should equal ("FLOAT")
-    expressionsConverter.sensExpressionToSql(BasicTypeLiteral(SensBasicTypes.BOOLEAN_TYPE)) should equal ("BOOLEAN")
-    expressionsConverter.sensExpressionToSql(BasicTypeLiteral(SensBasicTypes.STRING_TYPE)) should equal ("VARCHAR")
+    expressionsConverter.sensExpressionToSql(IntTypeLiteral()) should equal ("INTEGER")
+    expressionsConverter.sensExpressionToSql(FloatTypeLiteral()) should equal ("FLOAT")
+    expressionsConverter.sensExpressionToSql(BooleanTypeLiteral()) should equal ("BOOLEAN")
+    expressionsConverter.sensExpressionToSql(StringTypeLiteral(255)) should equal ("VARCHAR(255)")
+    expressionsConverter.sensExpressionToSql(
+      ListTypeLiteral(IntTypeLiteral())
+    ) should equal ("INTEGER ARRAY")
+    expressionsConverter.sensExpressionToSql(
+      MapTypeLiteral(Map(
+        "attr1" -> StringTypeLiteral(36),
+        "attr2" -> ListTypeLiteral(IntTypeLiteral())
+      ))
+    ) should equal("ROW(`attr1` VARCHAR(36), `attr2` INTEGER ARRAY)")
   }
 
   "attributes and objects" should "be converted to SQL correctly" in {
@@ -78,7 +87,7 @@ class ExpressionToSqlConverterTests extends AnyFlatSpec with Matchers {
     expressionsConverter.sensExpressionToSql(
       FunctionCall(
         FunctionReference("cast"),
-        ConceptAttribute(Nil, "attr") :: BasicTypeLiteral(SensBasicTypes.INT_TYPE) :: Nil)
+        ConceptAttribute(Nil, "attr") :: IntTypeLiteral() :: Nil)
     ) should equal("CAST(`attr` AS INTEGER)")
     expressionsConverter.sensExpressionToSql(
       FunctionCall(

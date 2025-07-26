@@ -8,7 +8,7 @@ import org.sens.core.expression
 import org.sens.core.expression.{ConceptAttribute, FunctionCall, NamedElementPlaceholder, literal}
 import org.sens.core.expression.concept.{AnonymousConceptDefinition, AnonymousFunctionConceptDefinition, ConceptReference, GenericConceptReference}
 import org.sens.core.expression.function.{AnonymousFunctionDefinition, FunctionReference}
-import org.sens.core.expression.literal.{IntLiteral, StringLiteral}
+import org.sens.core.expression.literal.{FloatTypeLiteral, IntLiteral, IntTypeLiteral, StringLiteral, StringTypeLiteral}
 import org.sens.core.expression.operation.comparison.{Equals, GreaterThan}
 import org.sens.core.expression.operation.logical.Not
 import org.sens.core.expression.operation.relational.Exists
@@ -75,6 +75,18 @@ class ConceptsParserTest extends AnyFlatSpec with Matchers {
         "myAttr",
         Some(IntLiteral(1)),
         Nil
+      )
+    )
+
+    conceptParser.parse(
+      conceptParser.sensAttributeParser,
+      "@PrimaryKey string(36) userId"
+    ).get should equal(
+      Attribute(
+        "userId",
+        None,
+        Annotation("PrimaryKey", Map()) :: Nil,
+        Some(StringTypeLiteral(36))
       )
     )
 
@@ -828,6 +840,25 @@ class ConceptsParserTest extends AnyFlatSpec with Matchers {
           Attribute("attr2", None, Nil) :: Nil,
         FileDataSource("myfile.csv", FileFormats.CSV),
         Annotation("Owner", Map("name" -> StringLiteral("Al1"))) :: Nil
+      )
+    )
+
+    conceptParser.parse(
+      conceptParser.sensConcept,
+      "@Source(path = \"my_bucket\")\n" +
+        "datasource myDataSource (" +
+        "@NotNull string(36) id, " +
+        "int categoryId, " +
+        "float amount)\n" +
+        "from CSV file \"myfile.csv\""
+    ).get should equal(
+      DataSourceConcept(
+        "myDataSource",
+        Attribute("id", None, Annotation("NotNull", Map()) :: Nil, Some(StringTypeLiteral(36))) ::
+          Attribute("categoryId", None, Nil, Some(IntTypeLiteral())) ::
+          Attribute("amount", None, Nil, Some(FloatTypeLiteral())) :: Nil,
+        FileDataSource("myfile.csv", FileFormats.CSV),
+        Annotation("Source", Map("path" -> StringLiteral("my_bucket"))) :: Nil
       )
     )
   }

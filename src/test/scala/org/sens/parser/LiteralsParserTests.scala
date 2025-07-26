@@ -2,7 +2,7 @@ package org.sens.parser
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.sens.core.expression.literal.{BasicTypeLiteral, BooleanLiteral, FloatLiteral, IntLiteral, ListLiteral, MapLiteral, NullLiteral, SensBasicTypes, SensLiteral, StringLiteral}
+import org.sens.core.expression.literal._
 
 class LiteralsParserTests extends AnyFlatSpec with Matchers {
 
@@ -29,11 +29,6 @@ class LiteralsParserTests extends AnyFlatSpec with Matchers {
     literalsParser("0").get should equal (IntLiteral(0))
     literalsParser("\"str\"").get should equal (StringLiteral("str"))
     literalsParser("\"\"").get should equal (StringLiteral(""))
-    literalsParser("int").get should equal (BasicTypeLiteral(SensBasicTypes.INT_TYPE))
-    literalsParser("float").get should equal (BasicTypeLiteral(SensBasicTypes.FLOAT_TYPE))
-    literalsParser("boolean").get should equal (BasicTypeLiteral(SensBasicTypes.BOOLEAN_TYPE))
-    literalsParser("string").get should equal (BasicTypeLiteral(SensBasicTypes.STRING_TYPE))
-
   }
 
   "List Literal" should "be parsed correctly" in {
@@ -73,6 +68,25 @@ class LiteralsParserTests extends AnyFlatSpec with Matchers {
           IntLiteral(5) -> StringLiteral("five")
         ))
       ))
+    )
+  }
+
+  "Type Literals" should "be parsed correctly" in {
+    literalsParser("int").get should equal(IntTypeLiteral())
+    literalsParser("float").get should equal(FloatTypeLiteral())
+    literalsParser("boolean").get should equal(BooleanTypeLiteral())
+    literalsParser("string(255)").get should equal(StringTypeLiteral(255))
+    literalsParser("list<string(255)>").get should equal(ListTypeLiteral(StringTypeLiteral(255)))
+    literalsParser("map<string(255) attr1, int attr2>").get should equal(
+      MapTypeLiteral(Map("attr1" -> StringTypeLiteral(255), "attr2" -> IntTypeLiteral()))
+    )
+    literalsParser("map<string(255) attr1, map<list<int> attr21, list<boolean> attr22> attr2>").get should equal(
+      MapTypeLiteral(Map(
+        "attr1" -> StringTypeLiteral(255),
+        "attr2" -> MapTypeLiteral(Map(
+          "attr21" -> ListTypeLiteral(IntTypeLiteral()),
+          "attr22" -> ListTypeLiteral(BooleanTypeLiteral())
+        ))))
     )
   }
 }

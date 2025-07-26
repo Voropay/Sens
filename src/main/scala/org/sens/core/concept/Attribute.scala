@@ -1,19 +1,21 @@
 package org.sens.core.concept
 
-import org.sens.core.SensElement
 import org.sens.core.expression.SensExpression
+import org.sens.core.expression.literal.SensTypeLiteral
 import org.sens.parser.ValidationContext
 
 import scala.util.Try
 
 case class Attribute(name: String,
                      value: Option[SensExpression],
-                     annotations: List[Annotation]) extends SensAttribute {
+                     annotations: List[Annotation],
+                     sensType: Option[SensTypeLiteral] = None) extends SensAttribute {
   override def getAttributeNames(context: ValidationContext): List[String] = name :: Nil
 
   override def getAttributes(context: ValidationContext): List[Attribute] = this :: Nil
   override def toSensString: String =
     (if (annotations.nonEmpty) annotations.map(_.toSensString).mkString(", ") + " " else "") +
+    (if (sensType.isDefined) sensType.get.toSensString else "") +
     name +
     (if (value.isDefined) " = " + value.get.toSensString else "")
 
@@ -21,7 +23,8 @@ case class Attribute(name: String,
     Try(Attribute(
       name,
       value.map(_.validateAndRemoveVariablePlaceholders(context).get),
-      annotations.map(_.validateAndRemoveVariablePlaceholders(context).get)
+      annotations.map(_.validateAndRemoveVariablePlaceholders(context).get),
+      sensType
     ))
   }
 
@@ -40,6 +43,7 @@ case class Attribute(name: String,
     Attribute(
       name,
       value.map(_.replaceSubExpression(replaceSubExpression, withSubExpression)),
-      annotations.map(_.replaceSubExpression(replaceSubExpression, withSubExpression))
+      annotations.map(_.replaceSubExpression(replaceSubExpression, withSubExpression)),
+      sensType.map(_.replaceSubExpression(replaceSubExpression, withSubExpression))
     )
 }
